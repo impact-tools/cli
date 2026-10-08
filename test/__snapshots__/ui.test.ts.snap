@@ -1,0 +1,27 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`terminal presentation > renders deterministic wide and compact logos, and no redirected banner 1`] = `
+"
+       ▄          ███                       █     █    █    █   █
+       █     █     █  ██ █  ███   ██   ███ ███    █    █    ██ ██
+      ▄█▄  ▀▀█▀▀   █  █ █ █ █  █    █ █     █     █    █    █ █ █
+   ▄▄▄███▄▄▄ ▀     █  █ █ █ ███   ███ █     █     █    █    █   █
+      ███         ███ █ █ █ █    ████  ███  ██    ████ ████ █   █
+       █     ▄    ▓ ▓ ▓   ▓ ▓    ▓ ▓▓   ▓▓   ▓    ▓▓▓▓ ▓▓▓▓ ▓
+   ▀   █          ▒ ▒     ▒ ▒    ▒ ▒▒   ▒▒   ▒    ▒▒ ▒ ▒▒ ▒ ▒
+                  ░       ░ ░    ░  ░    ░         ░ ░  ░ ░
+"
+`;
+
+exports[`terminal presentation > renders deterministic wide and compact logos, and no redirected banner 2`] = `
+"
+       .          ###                       #     #    #    #   #
+       :     +     #  ## #  ###   ##   ### ###    #    #    ## ##
+      +++  +++++   #  # # # #  #    # #     #     #    #    # # #
+   .:+++++:. +     #  # # # ###   ### #     #     #    #    #   #
+      +++         ### # # # #    ####  ###  ##    #### #### #   #
+       +     +    | | |   | |    | ||   ||   |    |||| |||| |
+   .   :          : :     : :    : ::   ::   :    :: : :: : :
+                  .       . .    .  .    .         . .  . .
+"
+`;

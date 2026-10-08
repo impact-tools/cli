@@ -1,0 +1,24 @@
+import { Effect, Schema } from "effect";
+
+import { CliError } from "../Errors.ts";
+
+export const DEFAULT_BASE_URL = "https://api.impactllm.com";
+
+const ApiKey = Schema.RedactedFromValue(Schema.String.check(Schema.isPattern(/^sk-imp-[0-9A-Za-z]{43}$/)));
+export const Connection = Schema.Struct({ baseUrl: Schema.String, apiKey: ApiKey });
+export type Connection = typeof Connection.Type;
+
+const loopback = (host: string) => ["localhost", "127.0.0.1", "[::1]"].includes(host) || host.endsWith(".localhost");
+
+/** Impact's origin: credentials, query, fragment and paths such as `/v1` are dropped. */
+export const baseUrl = (input: string) => {
+  const url = URL.parse(input);
+  return url?.protocol === "https:" || (url?.protocol === "http:" && loopback(url.hostname))
+    ? Effect.succeed(url.origin)
+    : Effect.fail(new CliError({ message: "Use an HTTPS Impact URL, or HTTP on localhost for development." }));
+};
+
+export const apiKey = (input: string) =>
+  Schema.decodeEffect(ApiKey)(input.trim()).pipe(
+    Effect.mapError(() => new CliError({ message: "Enter an Impact API key (sk-imp-…)." })),
+  );
