@@ -7,11 +7,13 @@ import { CliError, mapPlatformError } from "../Errors.ts";
 import { prepareClaude } from "./claude/Prepare.ts";
 import { executableVariable, findExecutable } from "./Client.ts";
 import { prepareCodex } from "./codex/Prepare.ts";
+import { prepareCursor } from "./cursor/Prepare.ts";
 import { prepareKilo, prepareOpenCode } from "./opencode/Prepare.ts";
 
 export const clients = {
   claude: { label: "Claude Code", prepare: prepareClaude },
   codex: { label: "Codex CLI", prepare: prepareCodex },
+  cursor: { label: "Cursor Desktop", prepare: prepareCursor },
   kilo: { label: "Kilo Code CLI", prepare: prepareKilo },
   opencode: { label: "OpenCode", prepare: prepareOpenCode },
 };

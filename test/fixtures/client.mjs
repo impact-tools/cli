@@ -9,9 +9,15 @@ if (args.length === 1 && args[0] === "--version") {
 }
 const settingsIndex = args.indexOf("--settings");
 const settings = settingsIndex >= 0 ? JSON.parse(args[settingsIndex + 1]) : undefined;
+const cursorBackend = args.find((arg) => arg.startsWith("--test-backend-url="))?.slice("--test-backend-url=".length);
+const cursorModels = cursorBackend
+  ? await fetch(`${cursorBackend}/v1/models`).then((response) => response.json())
+  : undefined;
 console.log(
   JSON.stringify({
     args,
+    cursorModels,
+    cursorIpc: process.env.VSCODE_IPC_HOOK_CLI,
     cwd: process.cwd(),
     kiloConfig: process.env.KILO_CONFIG_CONTENT ? JSON.parse(process.env.KILO_CONFIG_CONTENT) : undefined,
     openCodeConfig: process.env.OPENCODE_CONFIG_CONTENT ? JSON.parse(process.env.OPENCODE_CONFIG_CONTENT) : undefined,

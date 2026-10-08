@@ -5,6 +5,7 @@ import { login, logout } from "./commands/Auth.ts";
 import { clientCommand } from "./commands/Client.ts";
 import { doctor } from "./commands/Doctor.ts";
 import { helper, legacyAuth } from "./commands/Helper.ts";
+import { proxy } from "./commands/Proxy.ts";
 import { status } from "./commands/Status.ts";
 
 export const command = Command.make("impact").pipe(
@@ -20,6 +21,7 @@ export const command = Command.make("impact").pipe(
       ],
     },
     { group: "Diagnostics", commands: [doctor.pipe(Command.withShortDescription("Connection and installed clients"))] },
+    { group: "Connections", commands: [proxy] },
     helper,
     legacyAuth,
   ]),

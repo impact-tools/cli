@@ -1,4 +1,5 @@
 import { Redacted } from "effect";
+import { existsSync } from "node:fs";
 import which from "which";
 
 import type { Connection } from "../config/Connection.ts";
@@ -11,8 +12,11 @@ export interface LaunchOptions {
 
 export const executableVariable = (name: string) => `IMPACT_${name.toUpperCase()}_BIN`;
 
-export const findExecutable = (name: string): string | null =>
-  which.sync(process.env[executableVariable(name)] ?? name, { nothrow: true });
+export const findExecutable = (name: string): string | null => {
+  const desktop = "/Applications/Cursor.app/Contents/MacOS/Cursor";
+  const fallback = name === "cursor" && process.platform === "darwin" && existsSync(desktop) ? desktop : name;
+  return which.sync(process.env[executableVariable(name)] ?? fallback, { nothrow: true });
+};
 
 export const clientEnvironment = (connection: Connection): NodeJS.ProcessEnv => ({
   ...process.env,

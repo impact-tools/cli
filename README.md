@@ -1,6 +1,6 @@
 # Impact CLI
 
-Launch installed Claude Code, Codex, Kilo Code and OpenCode clients through Impact from your current directory.
+Launch installed Claude Code, Codex, Cursor Desktop, Kilo Code and OpenCode clients through Impact from your current directory.
 
 ```sh
 impact login --base-url https://api.impactllm.com
@@ -8,6 +8,7 @@ impact claude
 impact codex
 impact kilo
 impact opencode
+impact cursor
 impact status
 ```
 
@@ -49,6 +50,8 @@ bun run dev status
 ```
 
 The development script selects `http://impactllm.localhost:4420` and preserves the caller's working directory. HTTP is accepted only for loopback hosts. `IMPACT_BASE_URL` selects another endpoint when running `src/main.ts` directly or the built CLI.
+
+Interactive launches check the public npm registry for a newer CLI version and show a one-line update hint when one is available. The check is skipped for help, version, completions, non-TTY output and CI. Set `IMPACT_DISABLE_UPDATE_CHECK=1` to disable it explicitly.
 
 ```sh
 bun run build
@@ -106,20 +109,31 @@ impact opencode run --model impact/claude-opus-5-5 --variant max "Review this ch
 
 OpenCode adds its own `low`, `medium` and `high` variants to every reasoning model. The launcher disables each effort the gateway does not advertise, so the variant list matches `reasoning_efforts`; for example, a model advertising only `none` and `high` offers exactly those two. Requests carry OpenCode's own `User-Agent`, which Impact identifies as OpenCode. This integration was checked with OpenCode 1.18.31 and 1.18.34.
 
-## Cursor Tab autocomplete
+## Local proxy and Cursor Tab autocomplete
 
-The gateway supports native Cursor `StreamCpp` requests, but a Cursor Desktop Tab launcher or settings generator is not implemented in this CLI. Cursor's OpenAI key/base-URL override configures chat and agent, not Tab. Shell `--completions` scripts are unrelated to editor autocomplete.
+```sh
+# Serve the local API and native Cursor backend until Ctrl+C.
+impact proxy --port 8080
 
-The first desktop validation target is macOS; no desktop platform is verified yet. A persistent proxy and reversible Cursor setup are being evaluated for native Tab plus an Impact-only model picker. Editor proxy settings, local-provider discovery and Tab traffic need separate validation; changing the model list alone does not prove inference works. System proxy/PAC or trusted-CA changes must be explicit and reversible, with TLS verification retained. The Codex proxy is not a drop-in adapter: it uses a temporary native provider URL and child-scoped certificate setting.
+# Start a scoped proxy and open Cursor Desktop from this directory.
+impact cursor .
+```
 
-Static inspection of the official macOS ARM64 Cursor 3.22.12 distribution found its bundled local HTTP-provider mode disabled by a build flag. That mode also disables Tab when active, so it is not a verified solution for an Impact-only picker together with native Tab. Environment variables do not activate it.
+`impact proxy` prints a loopback capability URL and its OpenAI-compatible `/v1` base URL. Use the full printed URL, including its random path. The proxy supplies the saved Impact key for models, usage, Responses, Chat Completions, Messages and image API requests. It accepts HTTP/1.1 and cleartext HTTP/2; the URL expires when the process stops. It is a local backend endpoint, not an HTTP CONNECT proxy. Cursor's cloud-mediated OpenAI override needs the public Impact URL rather than this loopback address.
 
-See the [Cursor guide](https://impactllm.com/docs/clients/cursor) for the native endpoint, account requirements and current integration status. Do not add guessed Tab backend fields to `settings.json` or disable certificate verification to connect it.
+`impact cursor` supplies Cursor's native `--test-backend-url`, a dedicated persistent user-data directory and `--wait`. The backend override was found in the official macOS ARM64 Cursor 3.22.12 build. The profile defaults to `<Impact config directory>/cursor/profile`; sign in to a real Cursor account there on first use. Set `IMPACT_CURSOR_BIN` for another Desktop executable and `IMPACT_CURSOR_USER_DATA_DIR` for another managed profile. Run this on the computer with Desktop installed; the remote SSH/WSL Cursor CLI cannot configure local Tab. Close the managed profile's windows before relaunching so an existing process does not retain an old backend URL.
+
+Native `StreamCpp` requests go to Impact with Impact authorization. The gateway chooses its Cursor pool account according to the key's enabled funding sources. Other native RPCs use the editor's own Cursor login against Cursor's HTTP/1 backend. The local proxy preserves native Tab configuration while enabling the Impact-backed frontend, requesting full text, and disabling account-bound context chunks and FileSync. This avoids asking a gateway account to resolve files synced under the editor account. Tab config field numbers were checked against Cursor 3.22.12's shipped protobuf descriptors. This setup uses no custom CA or system trust changes.
+
+For a separately launched Desktop, keep `impact proxy` open and pass its **Cursor backend** URL through `--test-backend-url=<URL>`, together with a separate `--user-data-dir` and `--wait`. Closing the waited-for files/window or stopping Impact ends the managed proxy; keep it running for ongoing suggestions.
+
+Tests exercise the real CLI launcher, native config replies, opaque Connect streaming over HTTP/1.1 and HTTP/2, credential substitution, cancellation and cleanup. A live Desktop suggestion has not been verified in this environment. Other Cursor versions may change these internal flags or descriptors. The native gateway route remains `https://api.impactllm.com/aiserver.v1.AiService/StreamCpp`; the OpenAI base-URL setting configures chat and agent separately, and the launcher does not replace the Desktop model picker.
 
 ## Source layout
 
 - `clients/Launch.ts` lists the clients and runs the chosen one; `clients/Client.ts` holds what they share.
 - `clients/claude/` owns Claude settings, the model picker and the status line.
+- `clients/cursor/` owns the native Desktop backend, Tab configuration and dedicated launch profile.
 - `clients/codex/` owns Codex authentication, profiles, model catalog, loopback proxy, and TLS certificates.
 - `clients/opencode/` owns the launch overlay and model definitions, prices and reasoning variants shared by OpenCode and Kilo.
 - `commands/` defines the CLI commands; `Command.ts` assembles them. `impact helper token` and `impact helper status-line` are unlisted commands that clients call during a launch.
@@ -133,14 +147,16 @@ Expected failures are `CliError`s with a one-line message; `main.ts` prints it a
 
 ## Overrides
 
-| Variable                                                                          | Purpose                                                   |
-| --------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| `IMPACT_BASE_URL`                                                                 | Impact origin, without `/v1`                              |
-| `IMPACT_API_KEY`                                                                  | Key for this invocation; no need to save it               |
-| `IMPACT_MODEL`                                                                    | Initial model from the enabled catalog                    |
-| `IMPACT_CONFIG_DIR`                                                               | CLI credential directory                                  |
-| `IMPACT_CLAUDE_BIN`, `IMPACT_CODEX_BIN`, `IMPACT_KILO_BIN`, `IMPACT_OPENCODE_BIN` | Native client executable                                  |
-| `CODEX_HOME`                                                                      | Existing Codex configuration and authentication directory |
+| Variable                                                                                               | Purpose                                                   |
+| ------------------------------------------------------------------------------------------------------ | --------------------------------------------------------- |
+| `IMPACT_BASE_URL`                                                                                      | Impact origin, without `/v1`                              |
+| `IMPACT_API_KEY`                                                                                       | Key for this invocation; no need to save it               |
+| `IMPACT_MODEL`                                                                                         | Initial model from the enabled catalog                    |
+| `IMPACT_CONFIG_DIR`                                                                                    | CLI credential directory                                  |
+| `IMPACT_CLAUDE_BIN`, `IMPACT_CODEX_BIN`, `IMPACT_CURSOR_BIN`, `IMPACT_KILO_BIN`, `IMPACT_OPENCODE_BIN` | Native client executable                                  |
+| `IMPACT_CURSOR_USER_DATA_DIR`                                                                          | Persistent Cursor profile used by the launcher            |
+| `IMPACT_DISABLE_UPDATE_CHECK`                                                                          | Disable the interactive npm version check                 |
+| `CODEX_HOME`                                                                                           | Existing Codex configuration and authentication directory |
 
 Model routing is managed in `/admin/routing`. Public names such as `gpt-6.1-sol` and `claude-sonnet-5-5` select a configured provider and upstream model. Provider-prefixed internal names are rejected; the supported Claude aliases retain the configured route, prices and upstream ID.
 
