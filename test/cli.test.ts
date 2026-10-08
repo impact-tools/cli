@@ -284,6 +284,20 @@ describe("impact", () => {
     await expect(fetch(backend + "/v1/models")).rejects.toThrow();
   });
 
+  it("bootstraps an existing Cursor Desktop session into the managed profile", async () => {
+    const source = join(environment.directory, "native-cursor");
+    const target = join(environment.directory, "impact-cursor");
+    const sourceState = join(source, "User", "globalStorage", "state.vscdb");
+    await mkdir(join(source, "User", "globalStorage"), { recursive: true });
+    await writeFile(sourceState, "cursor auth state");
+    await impact(["cursor", "."], {
+      IMPACT_CURSOR_BIN: fixture,
+      IMPACT_CURSOR_PROFILE_SOURCE: source,
+      IMPACT_CURSOR_USER_DATA_DIR: target,
+    });
+    expect(await readFile(join(target, "User", "globalStorage", "state.vscdb"), "utf8")).toBe("cursor auth state");
+  });
+
   it("passes Cursor help through offline and rejects flags that bypass its managed connection", async () => {
     const result = await impact(["cursor", "--help"], { IMPACT_API_KEY: "", IMPACT_CURSOR_BIN: fixture });
     expect(JSON.parse(result.stdout).args).toEqual(["--help"]);

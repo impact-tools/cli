@@ -1,6 +1,6 @@
 import { Effect, FileSystem } from "effect";
 import envPaths from "env-paths";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 import type { LaunchOptions } from "../Client.ts";
 
@@ -8,6 +8,37 @@ import { CliError, mapPlatformError } from "../../Errors.ts";
 import { cursorProxy } from "./Proxy.ts";
 
 const RESERVED = ["--test-backend-url", "--user-data-dir", "--reuse-window", "-r"];
+
+const homeDirectory = () => process.env.HOME ?? process.env.USERPROFILE ?? process.cwd();
+
+/** Cursor keeps its Desktop session in this SQLite state store. */
+const defaultCursorUserDataDir = () => {
+  if (process.platform === "darwin") return join(homeDirectory(), "Library", "Application Support", "Cursor");
+  if (process.platform === "win32")
+    return join(process.env.APPDATA ?? join(homeDirectory(), "AppData", "Roaming"), "Cursor");
+  return join(process.env.XDG_CONFIG_HOME ?? join(homeDirectory(), ".config"), "Cursor");
+};
+
+const authStateFile = (directory: string) => join(directory, "User", "globalStorage", "state.vscdb");
+
+const bootstrapCursorSession = Effect.fnUntraced(
+  function* (fs: FileSystem.FileSystem, target: string) {
+    const sourceDirectory = process.env.IMPACT_CURSOR_PROFILE_SOURCE ?? defaultCursorUserDataDir();
+    const source = authStateFile(sourceDirectory);
+    const destination = authStateFile(target);
+    if (source === destination || !(yield* fs.exists(source)) || (yield* fs.exists(destination))) return;
+    yield* fs.makeDirectory(dirname(destination), { recursive: true, mode: 0o700 });
+    yield* fs.copyFile(source, destination);
+    yield* fs.chmod(destination, 0o600);
+    // SQLite may have a live WAL while Cursor is open. Copy sidecars when present so the
+    // managed profile sees the same committed auth rows on the first launch.
+    for (const suffix of ["-wal", "-shm"]) {
+      const sidecar = `${source}${suffix}`;
+      if (yield* fs.exists(sidecar)) yield* fs.copyFile(sidecar, `${destination}${suffix}`);
+    }
+  },
+  Effect.catch(() => Effect.void),
+);
 
 /** A separate profile keeps the normal Desktop process from swallowing the backend override. */
 export const prepareCursor = Effect.fn("prepareCursor")(function* ({ executable, args, connection }: LaunchOptions) {
@@ -25,6 +56,7 @@ export const prepareCursor = Effect.fn("prepareCursor")(function* ({ executable,
     join(process.env.IMPACT_CONFIG_DIR ?? envPaths("impact", { suffix: "" }).config, "cursor", "profile");
   const fs = yield* FileSystem.FileSystem;
   yield* fs.makeDirectory(directory, { recursive: true, mode: 0o700 });
+  yield* bootstrapCursorSession(fs, directory);
   const proxy = yield* cursorProxy(connection);
   const {
     IMPACT_API_KEY: _key,
