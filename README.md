@@ -28,9 +28,9 @@ You can also download the `.tgz` artifact from a successful Actions run and inst
 
 ## Build and release
 
-The `Build and release` workflow runs on pull requests, pushes to `main` and manual dispatch. It installs locked dependencies, checks types, runs tests, builds the Node.js bundle, packs a `.tgz`, installs that archive and runs it, then uploads it as the `npm-package` artifact.
+The `Build and release` workflow (`.github/workflows/publish.yml`) runs on pull requests, pushes to `main` and manual dispatch. It installs locked dependencies, checks types, runs tests, builds the Node.js bundle, packs a `.tgz`, installs that archive and runs it, then uploads it as the `npm-package` artifact.
 
-Releases are cut by [release-please](https://github.com/googleapis/release-please) from [Conventional Commits](https://www.conventionalcommits.org/): on every push to `main` it opens or updates a release PR that bumps the version in `package.json`, `.release-please-manifest.json` and `CHANGELOG.md`. Before 1.0, `feat` bumps the minor version and `fix` the patch. Merging the PR tags the release `v<version>`, creates the GitHub Release and publishes that commit's archive publicly to npmjs.com with the repository's `NPM_TOKEN` Actions secret: a granular token with read/write access to the `@impact-relay` scope and bypass 2FA enabled. The repository must allow GitHub Actions to create pull requests (Settings → Actions → General).
+Releases are cut by [release-please](https://github.com/googleapis/release-please) from [Conventional Commits](https://www.conventionalcommits.org/): on every push to `main` it opens or updates a release PR that bumps the version in `package.json`, `.release-please-manifest.json` and `CHANGELOG.md`. Before 1.0, `feat` bumps the minor version and `fix` the patch. Merging the PR tags the release `v<version>`, creates the GitHub Release and publishes that commit's archive publicly to npmjs.com through [npm trusted publishing](https://docs.npmjs.com/trusted-publishers): the package trusts `publish.yml` in this repository, so no npm token is stored. The repository must allow GitHub Actions to create pull requests (Settings → Actions → General).
 
 ## Development
 
