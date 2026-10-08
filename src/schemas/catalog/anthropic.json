@@ -1,0 +1,103 @@
+{
+  "vendor": "anthropic",
+  "models": [
+    {
+      "id": "claude-fable-5-1",
+      "name": "Claude Fable 5.1",
+      "summary": "Anthropic's most capable model; thinking is always on.",
+      "contextTokens": 1000000,
+      "maxOutputTokens": 128000,
+      "capabilities": ["reasoning", "vision", "tools"],
+      "efforts": ["low", "medium", "high", "xhigh", "max"],
+      "wireModel": "claude-fable-5-1",
+      "servedBy": "anthropic",
+      "chatgpt": false,
+      "official": { "input": 10, "output": 50, "cachedInput": 0.25, "cacheWrite": 12.5, "cacheWrite1h": 20 },
+      "tariff": { "input": 2, "output": 8, "cachedInput": 0.04, "cacheWrite": 1.9, "cacheWrite1h": 3 }
+    },
+    {
+      "id": "claude-opus-5-5",
+      "name": "Claude Opus 5.5",
+      "summary": "Long-running agentic coding and complex knowledge work.",
+      "contextTokens": 1000000,
+      "maxOutputTokens": 128000,
+      "capabilities": ["reasoning", "vision", "tools"],
+      "efforts": ["low", "medium", "high", "xhigh", "max"],
+      "wireModel": "claude-opus-5-5",
+      "servedBy": "anthropic",
+      "chatgpt": false,
+      "official": { "input": 4, "output": 20, "cachedInput": 0.2, "cacheWrite": 5, "cacheWrite1h": 8 },
+      "tariff": { "input": 1, "output": 4, "cachedInput": 0.04, "cacheWrite": 0.88, "cacheWrite1h": 1.4 }
+    },
+    {
+      "id": "claude-sonnet-5-5",
+      "name": "Claude Sonnet 5.5",
+      "summary": "Fast frontier model with adaptive thinking.",
+      "contextTokens": 1000000,
+      "maxOutputTokens": 128000,
+      "capabilities": ["reasoning", "vision", "tools"],
+      "efforts": ["low", "medium", "high", "xhigh", "max"],
+      "wireModel": "claude-sonnet-5-5",
+      "servedBy": "anthropic",
+      "chatgpt": false,
+      "official": { "input": 2, "output": 10, "cachedInput": 0.2, "cacheWrite": 2.5, "cacheWrite1h": 4 },
+      "tariff": { "input": 0.5, "output": 2, "cachedInput": 0.024, "cacheWrite": 0.3, "cacheWrite1h": 0.48 }
+    },
+    {
+      "id": "claude-sonnet-5",
+      "name": "Claude Sonnet 5",
+      "summary": "The previous Sonnet, at the same price.",
+      "contextTokens": 1000000,
+      "maxOutputTokens": 128000,
+      "capabilities": ["reasoning", "vision", "tools"],
+      "efforts": ["low", "medium", "high", "xhigh", "max"],
+      "wireModel": "claude-sonnet-5",
+      "servedBy": "anthropic",
+      "chatgpt": false,
+      "official": { "input": 2, "output": 10, "cachedInput": 0.2, "cacheWrite": 2.5, "cacheWrite1h": 4 },
+      "tariff": { "input": 0.5, "output": 2, "cachedInput": 0.024, "cacheWrite": 0.3, "cacheWrite1h": 0.48 }
+    },
+    {
+      "id": "claude-opus-4-8",
+      "name": "Claude Opus 4.8",
+      "summary": "Adaptive thinking for complex coding and agentic workflows.",
+      "contextTokens": 1000000,
+      "maxOutputTokens": 128000,
+      "capabilities": ["reasoning", "vision", "tools"],
+      "efforts": ["low", "medium", "high", "xhigh", "max"],
+      "wireModel": "claude-opus-4-8",
+      "servedBy": "anthropic",
+      "chatgpt": false,
+      "official": { "input": 5, "output": 25, "cachedInput": 0.5, "cacheWrite": 6.25, "cacheWrite1h": 10 },
+      "tariff": { "input": 0.8, "output": 3.5, "cachedInput": 0.06, "cacheWrite": 0.75, "cacheWrite1h": 1.2 }
+    },
+    {
+      "id": "claude-opus-4-7",
+      "name": "Claude Opus 4.7",
+      "summary": "Earlier Opus, kept for workloads pinned to it.",
+      "contextTokens": 1000000,
+      "maxOutputTokens": 128000,
+      "capabilities": ["reasoning", "vision", "tools"],
+      "efforts": ["low", "medium", "high", "xhigh", "max"],
+      "wireModel": "claude-opus-4-7",
+      "servedBy": "anthropic",
+      "chatgpt": false,
+      "official": { "input": 5, "output": 25, "cachedInput": 0.5, "cacheWrite": 6.25, "cacheWrite1h": 10 },
+      "tariff": { "input": 0.8, "output": 3.5, "cachedInput": 0.06, "cacheWrite": 0.75, "cacheWrite1h": 1.2 }
+    },
+    {
+      "id": "claude-haiku-5-5",
+      "name": "Claude Haiku 5.5",
+      "summary": "The fastest Claude, for high-volume and latency-sensitive work.",
+      "contextTokens": 200000,
+      "maxOutputTokens": 64000,
+      "capabilities": ["reasoning", "vision", "tools"],
+      "efforts": ["low", "medium", "high", "xhigh", "max"],
+      "wireModel": "claude-haiku-5-5",
+      "servedBy": "anthropic",
+      "chatgpt": false,
+      "official": { "input": 1, "output": 5, "cachedInput": 0.1, "cacheWrite": 1.25, "cacheWrite1h": 2 },
+      "tariff": { "input": 0.15, "output": 0.75, "cachedInput": 0.012, "cacheWrite": 0.15, "cacheWrite1h": 0.24 }
+    }
+  ]
+}

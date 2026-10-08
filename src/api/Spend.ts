@@ -1,9 +1,8 @@
 import type { Duration } from "effect";
 
-import { UsageSpend } from "@impact-llm/schemas";
-
 import type { Connection } from "../config/Connection.ts";
 
+import { UsageSpend } from "../schemas/Spend.ts";
 import { getJson } from "./Http.ts";
 
 export const fetchSpend = (connection: Connection, timeout?: Duration.Input) =>

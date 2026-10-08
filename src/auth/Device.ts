@@ -1,4 +1,3 @@
-import { DEFAULT_FUNDING, ImpactRpcs } from "@impact-llm/schemas";
 import { createAuthClient } from "better-auth/client";
 import { deviceAuthorizationClient } from "better-auth/client/plugins";
 import { Effect, Layer, Redacted } from "effect";
@@ -9,6 +8,8 @@ import open from "open";
 
 import { apiKey, type Connection } from "../config/Connection.ts";
 import { CliError } from "../Errors.ts";
+import { DEFAULT_FUNDING } from "../schemas/Billing.ts";
+import { ImpactRpcs } from "../schemas/Rpcs.ts";
 import { Output } from "../ui/Output.ts";
 import { withProgress } from "../ui/Progress.ts";
 

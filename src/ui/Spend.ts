@@ -1,5 +1,6 @@
-import { usdFromMicros, type UsageSpend } from "@impact-llm/schemas";
+import type { UsageSpend } from "../schemas/Spend.ts";
 
+import { usdFromMicros } from "../schemas/Pricing.ts";
 import * as Layout from "./Layout.ts";
 import { clean, type Capabilities } from "./Theme.ts";
 

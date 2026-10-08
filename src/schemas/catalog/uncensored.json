@@ -1,0 +1,33 @@
+{
+  "vendor": "uncensored",
+  "models": [
+    {
+      "id": "glm-5.3-uncensored",
+      "name": "GLM 5.3 Uncensored",
+      "summary": "GLM 5.3 with refusal tuning removed.",
+      "contextTokens": 200000,
+      "maxOutputTokens": 32000,
+      "capabilities": ["reasoning", "tools"],
+      "efforts": ["none", "high"],
+      "wireModel": "glm-5.3-uncensored",
+      "servedBy": "impact",
+      "chatgpt": false,
+      "official": { "input": 1.2, "output": 4, "cachedInput": 0.24, "cacheWrite": 1.2 },
+      "tariff": { "input": 0.25, "output": 0.8, "cachedInput": 0.048, "cacheWrite": 0.24 }
+    },
+    {
+      "id": "glm-5.3-flash-uncensored",
+      "name": "GLM 5.3 Flash Uncensored",
+      "summary": "The fast GLM 5.3, refusal tuning removed.",
+      "contextTokens": 200000,
+      "maxOutputTokens": 32000,
+      "capabilities": ["tools"],
+      "efforts": [],
+      "wireModel": "glm-5.3-flash-uncensored",
+      "servedBy": "impact",
+      "chatgpt": false,
+      "official": { "input": 0.15, "output": 0.6, "cachedInput": 0.03, "cacheWrite": 0.15 },
+      "tariff": { "input": 0.03, "output": 0.12, "cachedInput": 0.006, "cacheWrite": 0.03 }
+    }
+  ]
+}

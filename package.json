@@ -1,7 +1,11 @@
 {
-  "name": "@impact-llm/cli",
+  "name": "@impact-relay/cli",
   "version": "0.1.0",
   "description": "Launch coding clients through Impact LLM.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/impact-relay/cli.git"
+  },
   "bin": {
     "impact": "./dist/impact.js"
   },
@@ -10,6 +14,9 @@
     "README.md"
   ],
   "type": "module",
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
   "scripts": {
     "dev": "IMPACT_LAUNCH_CWD=\"${IMPACT_LAUNCH_CWD:-$PWD}\" IMPACT_BASE_URL=\"${IMPACT_BASE_URL:-http://impactllm.localhost:4420}\" bun --no-env-file src/main.ts",
     "build": "bun --no-env-file build.ts",
@@ -18,9 +25,12 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
-  "dependencies": {
+  "devDependencies": {
     "@effect/platform-node": "4.0.0-rc.118",
-    "@impact-llm/schemas": "workspace:*",
+    "@effect/vitest": "4.0.0-rc.118",
+    "@types/bun": "1.4.2",
+    "@types/http-proxy": "1.17.17",
+    "@types/which": "3.0.4",
     "better-auth": "1.7.6",
     "effect": "4.0.0-rc.118",
     "env-paths": "4.0.0",
@@ -30,15 +40,12 @@
     "selfsigned": "5.5.0",
     "smol-toml": "1.4.2",
     "string-width": "7.2.0",
+    "typescript": "7.0.2",
+    "vitest": "5.0.2",
     "which": "6.0.1"
-  },
-  "devDependencies": {
-    "@effect/vitest": "4.0.0-rc.118",
-    "@types/http-proxy": "1.17.17",
-    "@types/which": "3.0.4",
-    "vitest": "5.0.2"
   },
   "engines": {
     "node": ">=22"
-  }
+  },
+  "packageManager": "bun@1.4.2"
 }

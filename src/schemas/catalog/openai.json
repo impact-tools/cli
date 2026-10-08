@@ -1,0 +1,103 @@
+{
+  "vendor": "openai",
+  "models": [
+    {
+      "id": "gpt-6.1-sol",
+      "name": "GPT-6.1 Sol",
+      "summary": "Near-Astra quality for coding, computer use and professional work.",
+      "contextTokens": 272000,
+      "maxOutputTokens": 128000,
+      "capabilities": ["reasoning", "vision", "tools"],
+      "efforts": ["low", "medium", "high", "xhigh", "max"],
+      "wireModel": "gpt-6.1-sol",
+      "servedBy": "openai",
+      "chatgpt": true,
+      "official": { "input": 2, "output": 10, "cachedInput": 0.1, "cacheWrite": 2.5 },
+      "tariff": { "input": 0.2, "output": 1, "cachedInput": 0.01, "cacheWrite": 0.25 }
+    },
+    {
+      "id": "gpt-6-astra",
+      "name": "GPT-6 Astra",
+      "summary": "OpenAI's most capable model, for the most demanding work.",
+      "contextTokens": 272000,
+      "maxOutputTokens": 128000,
+      "capabilities": ["reasoning", "vision", "tools"],
+      "efforts": ["low", "medium", "high", "xhigh", "max"],
+      "wireModel": "gpt-6-astra",
+      "servedBy": "openai",
+      "chatgpt": true,
+      "official": { "input": 10, "output": 50, "cachedInput": 1, "cacheWrite": 12.5 },
+      "tariff": { "input": 1, "output": 4, "cachedInput": 0.1, "cacheWrite": 1.25 }
+    },
+    {
+      "id": "gpt-6-sol",
+      "name": "GPT-6 Sol",
+      "summary": "Built for complex coding and agentic workflows.",
+      "contextTokens": 272000,
+      "maxOutputTokens": 128000,
+      "capabilities": ["reasoning", "vision", "tools"],
+      "efforts": ["low", "medium", "high", "xhigh", "max"],
+      "wireModel": "gpt-6-sol",
+      "servedBy": "openai",
+      "chatgpt": true,
+      "official": { "input": 2, "output": 10, "cachedInput": 0.2, "cacheWrite": 2.5 },
+      "tariff": { "input": 0.2, "output": 1, "cachedInput": 0.02, "cacheWrite": 0.25 }
+    },
+    {
+      "id": "gpt-6-luna",
+      "name": "GPT-6 Luna",
+      "summary": "The smallest GPT-6, for high-volume, low-latency calls.",
+      "contextTokens": 272000,
+      "maxOutputTokens": 128000,
+      "capabilities": ["reasoning", "vision", "tools"],
+      "efforts": ["low", "medium", "high", "xhigh", "max"],
+      "wireModel": "gpt-6-luna",
+      "servedBy": "openai",
+      "chatgpt": true,
+      "official": { "input": 0.1, "output": 0.5, "cachedInput": 0.01, "cacheWrite": 0.125 },
+      "tariff": { "input": 0.01, "output": 0.05, "cachedInput": 0.001, "cacheWrite": 0.0125 }
+    },
+    {
+      "id": "gpt-5.6-sol",
+      "name": "GPT-5.6 Sol",
+      "summary": "Flagship of the 5.6 family, with reasoning effort up to max.",
+      "contextTokens": 272000,
+      "maxOutputTokens": 128000,
+      "capabilities": ["reasoning", "vision", "tools"],
+      "efforts": ["low", "medium", "high", "xhigh", "max"],
+      "wireModel": "gpt-5.6-sol",
+      "servedBy": "openai",
+      "chatgpt": true,
+      "official": { "input": 4, "output": 20, "cachedInput": 0.4, "cacheWrite": 5 },
+      "tariff": { "input": 0.4, "output": 2, "cachedInput": 0.04, "cacheWrite": 0.5 }
+    },
+    {
+      "id": "gpt-5.6-terra",
+      "name": "GPT-5.6 Terra",
+      "summary": "Balances intelligence and cost; the mini tier of 5.6.",
+      "contextTokens": 272000,
+      "maxOutputTokens": 128000,
+      "capabilities": ["reasoning", "vision", "tools"],
+      "efforts": ["low", "medium", "high", "xhigh", "max"],
+      "wireModel": "gpt-5.6-terra",
+      "servedBy": "openai",
+      "chatgpt": true,
+      "official": { "input": 2, "output": 12, "cachedInput": 0.2, "cacheWrite": 2.5 },
+      "tariff": { "input": 0.2, "output": 1.2, "cachedInput": 0.02, "cacheWrite": 0.25 }
+    },
+    {
+      "id": "gpt-5.6-luna",
+      "name": "GPT-5.6 Luna",
+      "summary": "The smallest 5.6 model, for high-volume, low-latency calls.",
+      "contextTokens": 272000,
+      "maxOutputTokens": 128000,
+      "capabilities": ["reasoning", "vision", "tools"],
+      "efforts": ["low", "medium", "high", "xhigh", "max"],
+      "wireModel": "gpt-5.6-luna",
+      "servedBy": "openai",
+      "chatgpt": true,
+      "official": { "input": 0.2, "output": 1.2, "cachedInput": 0.02, "cacheWrite": 0.25 },
+      "tariff": { "input": 0.02, "output": 0.12, "cachedInput": 0.002, "cacheWrite": 0.025 }
+    }
+  ]
+}

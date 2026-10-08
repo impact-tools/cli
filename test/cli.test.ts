@@ -9,6 +9,7 @@ import { promisify } from "node:util";
 import { parse } from "smol-toml";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { version } from "../package.json";
 import { isolatedEnvironment } from "./support/Environment.ts";
 import { impactBody, key } from "./support/Impact.ts";
 
@@ -113,7 +114,7 @@ describe("impact", () => {
 
   it("prints only the plain version when output is redirected", async () => {
     const result = await impact(["--version"], { FORCE_COLOR: "3", TERM: "xterm-256color" });
-    expect(result.stdout).toBe("impact v0.1.0\n");
+    expect(result.stdout).toBe(`impact v${version}\n`);
     expect(result.stderr).toBe("");
   });
 
@@ -398,11 +399,17 @@ describe("impact", () => {
     expect(body.input).toBe("context from stdin\n");
   });
 
-  it("launches clients from the caller's workspace when using the root dev script", async () => {
-    const workspace = resolve("..");
-    const result = await run("bun", ["run", "cli:dev", "claude", "-p", "hello"], {
+  it("launches clients from the supplied workspace when using the dev script", async () => {
+    const workspace = environment.directory;
+    const result = await run("bun", ["run", "--cwd", resolve("."), "dev", "claude", "-p", "hello"], {
       cwd: workspace,
-      env: { ...process.env, IMPACT_CLAUDE_BIN: fixture, IMPACT_API_KEY: key, IMPACT_BASE_URL: endpoint },
+      env: {
+        ...process.env,
+        IMPACT_LAUNCH_CWD: workspace,
+        IMPACT_CLAUDE_BIN: fixture,
+        IMPACT_API_KEY: key,
+        IMPACT_BASE_URL: endpoint,
+      },
     });
     expect(JSON.parse(result.stdout).cwd).toBe(workspace);
   });

@@ -1,10 +1,10 @@
-import { catalogModel, MODEL_EFFORTS } from "@impact-llm/schemas";
 import { Effect, Schema } from "effect";
 
 import type { Connection } from "../../config/Connection.ts";
 
 import { getJson } from "../../api/Http.ts";
 import { CliError } from "../../Errors.ts";
+import { catalogModel, MODEL_EFFORTS } from "../../schemas/Catalog.ts";
 
 const Tokens = Schema.Int.check(Schema.isGreaterThan(0));
 const Price = Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0));

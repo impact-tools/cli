@@ -1,10 +1,10 @@
-import { catalogAliases } from "@impact-llm/schemas";
 import { Effect, Option, Schema } from "effect";
 
 import type { Connection } from "../../config/Connection.ts";
 
 import { getJson } from "../../api/Http.ts";
 import { CliError } from "../../Errors.ts";
+import { catalogAliases } from "../../schemas/Catalog.ts";
 
 const Catalog = Schema.Struct({
   data: Schema.Array(

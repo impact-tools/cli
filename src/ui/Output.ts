@@ -1,6 +1,6 @@
-import type { UsageSpend } from "@impact-llm/schemas";
-
 import { Console, Context, Effect } from "effect";
+
+import type { UsageSpend } from "../schemas/Spend.ts";
 
 import * as Layout from "./Layout.ts";
 import { logo } from "./Logo.ts";

@@ -15,26 +15,56 @@ Login uses Better Auth device authorization: approve the terminal's code in your
 
 For an existing key, use `impact login --api-key` for a hidden prompt or `impact login --key-stdin`. Native client arguments pass through unchanged, including `impact claude -p "hello"` and `impact codex exec "hello"`.
 
-## Development
+## Installation from GitHub Packages
 
-From the repository root:
+The npm package is `@impact-relay/cli`, hosted at `https://npm.pkg.github.com`. You need Node.js 22 or later and a GitHub personal access token (classic) with `read:packages` and access to the package. An npmjs.com account is not required. GitHub's npm registry requires authentication even for public packages.
 
 ```sh
-bun run cli:dev login
-bun run cli:dev claude
-bun run cli:dev codex
-bun run cli:dev kilo
-bun run cli:dev opencode
-bun run cli:dev status
+npm login --scope=@impact-relay --auth-type=legacy --registry=https://npm.pkg.github.com
+npm install --global @impact-relay/cli --registry=https://npm.pkg.github.com
+impact --version
+```
+
+At the login prompt, use your GitHub username and enter the token as the password. If your organization requires SSO, authorize the token for that organization.
+
+You can also download the `.tgz` artifact from a successful Actions run and install it with `npm install --global ./impact-relay-cli-0.1.0.tgz`. The archive includes the bundled CLI and requires no runtime dependencies or Bun installation.
+
+## Build and publish
+
+The `Build and publish npm package` workflow runs on pushes to `main`, pull requests and manual dispatch. It installs locked dependencies, checks types, runs tests, builds the Node.js bundle, packs a `.tgz`, and verifies installation of that archive before uploading it as the `npm-package` artifact.
+
+Publishing a GitHub Release also runs the checks and publishes the same archive to GitHub Packages using the workflow's `GITHUB_TOKEN`. No npm token or additional repository secret is needed. The release tag must match `v` plus the version in `package.json`; for the current version, use `v0.1.0`. Prereleases use the `next` npm tag; other releases use `latest`.
+
+For subsequent releases, update the package version and lockfile, commit them, and publish a matching GitHub Release:
+
+```sh
+npm version patch --no-git-tag-version
+bun install
+```
+
+## Development
+
+This repository builds independently with Bun 1.4.2:
+
+```sh
+bun install --frozen-lockfile
+bun run typecheck
+bun run test
+bun run dev login
+bun run dev claude
+bun run dev codex
+bun run dev kilo
+bun run dev opencode
+bun run dev status
 ```
 
 The development script selects `http://impactllm.localhost:4420` and preserves the caller's working directory. HTTP is accepted only for loopback hosts. `IMPACT_BASE_URL` selects another endpoint when running `src/main.ts` directly or the built CLI.
 
 ```sh
-bun run cli:build
-node cli/dist/impact.js --help
-bun run cli:build:bin
-cli/dist/impact --help
+bun run build
+node dist/impact.js --help
+bun run build:bin
+dist/impact --help
 ```
 
 ## Claude Code configuration
@@ -94,7 +124,7 @@ The first desktop validation target is macOS; no desktop platform is verified ye
 
 Static inspection of the official macOS ARM64 Cursor 3.22.12 distribution found its bundled local HTTP-provider mode disabled by a build flag. That mode also disables Tab when active, so it is not a verified solution for an Impact-only picker together with native Tab. Environment variables do not activate it.
 
-See the [Cursor guide](../packages/web/content/docs/clients/cursor.mdx) for the native endpoint, account requirements and current integration status. Do not add guessed Tab backend fields to `settings.json` or disable certificate verification to connect it.
+See the [Cursor guide](https://impactllm.com/docs/clients/cursor) for the native endpoint, account requirements and current integration status. Do not add guessed Tab backend fields to `settings.json` or disable certificate verification to connect it.
 
 ## Source layout
 
@@ -106,6 +136,7 @@ See the [Cursor guide](../packages/web/content/docs/clients/cursor.mdx) for the 
 - `auth/` handles Impact device authorization and API key input.
 - `config/` validates connections and stores credentials.
 - `api/` calls Impact: `Http.ts` makes authenticated JSON requests, the other modules read models and usage.
+- `schemas/` contains the API contract and model catalog copied from the gateway's shared schemas for independent builds. Keep these contracts in sync when changing the gateway's API. The CLI RPC group includes only API key creation.
 - `process/` builds the command lines clients use to call back into this CLI.
 
 Expected failures are `CliError`s with a one-line message; `main.ts` prints it and exits with code 1. Effect handles argument parsing, HTTP and scoped cleanup of processes, profiles, sockets, and temporary certificates. The process spawner uses the Node platform implementation, so both the Node JavaScript bundle and compiled Bun executable are supported.
