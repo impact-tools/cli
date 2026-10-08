@@ -15,17 +15,14 @@ Login uses Better Auth device authorization: approve the terminal's code in your
 
 For an existing key, use `impact login --api-key` for a hidden prompt or `impact login --key-stdin`. Native client arguments pass through unchanged, including `impact claude -p "hello"` and `impact codex exec "hello"`.
 
-## Installation from GitHub Packages
+## Installation from npm
 
-The npm package is `@impact-relay/cli`, hosted at `https://npm.pkg.github.com`. You need Node.js 22 or later and a GitHub personal access token (classic) with `read:packages` and access to the package. An npmjs.com account is not required. GitHub's npm registry requires authentication even for public packages.
+The public npm package is `@impact-relay/cli`, hosted on npmjs.com. You need Node.js 22 or later. Installation requires no npm account or token.
 
 ```sh
-npm login --scope=@impact-relay --auth-type=legacy --registry=https://npm.pkg.github.com
-npm install --global @impact-relay/cli --registry=https://npm.pkg.github.com
+npm install --global @impact-relay/cli
 impact --version
 ```
-
-At the login prompt, use your GitHub username and enter the token as the password. If your organization requires SSO, authorize the token for that organization.
 
 You can also download the `.tgz` artifact from a successful Actions run and install it with `npm install --global ./impact-relay-cli-0.1.0.tgz`. The archive includes the bundled CLI and requires no runtime dependencies or Bun installation.
 
@@ -33,7 +30,7 @@ You can also download the `.tgz` artifact from a successful Actions run and inst
 
 The `Build and publish npm package` workflow runs on pushes to `main`, pull requests and manual dispatch. It installs locked dependencies, checks types, runs tests, builds the Node.js bundle, packs a `.tgz`, and verifies installation of that archive before uploading it as the `npm-package` artifact.
 
-Publishing a GitHub Release also runs the checks and publishes the same archive to GitHub Packages using the workflow's `GITHUB_TOKEN`. No npm token or additional repository secret is needed. The release tag must match `v` plus the version in `package.json`; for the current version, use `v0.1.0`. Prereleases use the `next` npm tag; other releases use `latest`.
+Publishing a GitHub Release also runs the checks and publishes the same archive publicly to npmjs.com using the repository's `NPM_TOKEN` Actions secret. Use a granular npm token with read/write access to the `@impact-relay` scope and bypass 2FA enabled for unattended publishing. The release tag must match `v` plus the version in `package.json`; for the current version, use `v0.1.0`. Prereleases use the `next` npm tag; other releases use `latest`.
 
 For subsequent releases, update the package version and lockfile, commit them, and publish a matching GitHub Release:
 

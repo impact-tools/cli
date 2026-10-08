@@ -15,7 +15,8 @@
   ],
   "type": "module",
   "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
   },
   "scripts": {
     "dev": "IMPACT_LAUNCH_CWD=\"${IMPACT_LAUNCH_CWD:-$PWD}\" IMPACT_BASE_URL=\"${IMPACT_BASE_URL:-http://impactllm.localhost:4420}\" bun --no-env-file src/main.ts",
