@@ -5,6 +5,7 @@ import { CliOutput, Command, Prompt } from "effect/cli";
 
 import { version } from "../package.json";
 import * as Http from "./api/Http.ts";
+import { checkForUpdate } from "./api/Update.ts";
 import { command } from "./Command.ts";
 import { clientArguments } from "./commands/Client.ts";
 import { welcomeAccount } from "./ui/Account.ts";
@@ -19,11 +20,28 @@ Effect.suspend(() => {
   const output = makeOutput();
   // Helpers and native clients never enter a branded screen; only human output requests a banner.
   const args = clientArguments(process.argv.slice(2));
+  const updateCheck =
+    process.stdout.isTTY === true &&
+    process.env.IMPACT_DISABLE_UPDATE_CHECK !== "1" &&
+    !args.some((arg) => ["--help", "-h", "--version", "-v", "--completions"].includes(arg))
+      ? checkForUpdate(version).pipe(
+          Effect.flatMap((update) =>
+            update._tag === "Some"
+              ? output.notice(
+                  "primary",
+                  `New version available: v${update.value.current} → v${update.value.latest}. Update with npm install --global @impact-relay/cli.`,
+                )
+              : Effect.void,
+          ),
+          Effect.catch(() => Effect.void),
+        )
+      : Effect.void;
   const run =
     args.length === 0
       ? welcomeAccount.pipe(Effect.flatMap((account) => Console.log(welcome(command, output, account))))
       : Command.runWith(command, { version })(args);
-  return run.pipe(
+  return updateCheck.pipe(
+    Effect.andThen(run),
     Effect.catchTag("CliError", (error) =>
       Console.error(output.error(error.message)).pipe(
         Effect.andThen(

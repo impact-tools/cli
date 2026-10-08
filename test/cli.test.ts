@@ -2,7 +2,7 @@ import type { AddressInfo } from "node:net";
 
 import { execFile, spawn } from "node:child_process";
 import { once } from "node:events";
-import { readdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, stat, symlink, writeFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
 import { join, resolve } from "node:path";
 import { promisify } from "node:util";
@@ -56,7 +56,19 @@ describe("impact", () => {
     expect(result.stdout).toContain("Sign in to continue");
     expect(result.stdout).toContain("Connect your Impact account to launch coding clients.");
     expect(result.stdout).toContain("impact login");
-    for (const command of ["claude", "codex", "kilo", "opencode", "status", "logout", "doctor", "helper", "auth"])
+    for (const command of [
+      "claude",
+      "codex",
+      "cursor",
+      "kilo",
+      "opencode",
+      "proxy",
+      "status",
+      "logout",
+      "doctor",
+      "helper",
+      "auth",
+    ])
       expect(result.stdout).not.toContain(`impact ${command}`);
     for (const hidden of ["Start a client", "Diagnostics", "--completions", "--log-level", "FLAGS", "status-line"])
       expect(result.stdout).not.toContain(hidden);
@@ -236,15 +248,94 @@ describe("impact", () => {
     const result = await impact(["doctor"], {
       IMPACT_CLAUDE_BIN: fixture,
       IMPACT_CODEX_BIN: missing,
+      IMPACT_CURSOR_BIN: missing,
       IMPACT_KILO_BIN: fixture,
       IMPACT_OPENCODE_BIN: missing,
       FORCE_COLOR: "3",
       TERM: "xterm-256color",
     });
     expect(result.stdout).toBe(
-      `Impact: ${endpoint}\nModels: 2\nclaude: ${fixture}\ncodex: not installed\nkilo: ${fixture}\nopencode: not installed\n`,
+      `Impact: ${endpoint}\nModels: 2\nclaude: ${fixture}\ncodex: not installed\ncursor: not installed\nkilo: ${fixture}\nopencode: not installed\n`,
     );
     expect(result.stderr).toBe("");
+  });
+
+  it.each([false, true])("launches Cursor with a scoped backend and persistent profile (custom=%s)", async (custom) => {
+    const directory = join(environment.directory, custom ? "custom-profile" : "cursor/profile");
+    const result = await impact(["cursor", "--new-window", "a path with spaces"], {
+      IMPACT_CURSOR_BIN: fixture,
+      ...(custom ? { IMPACT_CURSOR_USER_DATA_DIR: directory } : {}),
+      VSCODE_IPC_HOOK_CLI: "existing-cursor-ipc",
+    });
+    const body = JSON.parse(result.stdout);
+    expect(body.args.slice(0, 2)).toEqual(["--user-data-dir", directory]);
+    expect(body.args.slice(3)).toEqual(["--wait", "--new-window", "a path with spaces"]);
+    expect(body.args.join(" ")).not.toContain(key);
+    expect(body.key).toBeUndefined();
+    expect(body.cursorIpc).toBeUndefined();
+    expect(body.cursorModels.data.map((model: { id: string }) => model.id)).toEqual([
+      "claude-sonnet-5-5",
+      "gpt-6.1-sol",
+    ]);
+    expect((await stat(directory)).isDirectory()).toBe(true);
+    expect(requests).toEqual(["/v1/models"]);
+    const backend = body.args[2].slice("--test-backend-url=".length);
+    expect(new URL(backend).hostname).toBe("127.0.0.1");
+    await expect(fetch(backend + "/v1/models")).rejects.toThrow();
+  });
+
+  it("passes Cursor help through offline and rejects flags that bypass its managed connection", async () => {
+    const result = await impact(["cursor", "--help"], { IMPACT_API_KEY: "", IMPACT_CURSOR_BIN: fixture });
+    expect(JSON.parse(result.stdout).args).toEqual(["--help"]);
+    expect(requests).toEqual([]);
+    await expect(impact(["cursor", "--reuse-window"], { IMPACT_CURSOR_BIN: fixture })).rejects.toMatchObject({
+      code: 1,
+      stderr: "Impact supplies Cursor's backend and profile. Use IMPACT_CURSOR_USER_DATA_DIR to select a profile.\n",
+    });
+    const remote = join(environment.directory, ".cursor-server", "bin", "cursor");
+    await mkdir(join(remote, ".."), { recursive: true });
+    await symlink(fixture, remote);
+    await expect(impact(["cursor", "."], { IMPACT_CURSOR_BIN: remote })).rejects.toMatchObject({
+      code: 1,
+      stderr:
+        "Run impact cursor on the computer with Cursor Desktop installed; the remote CLI cannot configure Desktop Tab.\n",
+    });
+    expect(requests).toEqual([]);
+  });
+
+  it("serves API traffic until the standalone proxy receives SIGINT, then releases its listener", async () => {
+    const child = spawn("bun", ["--no-env-file", entry, "proxy", "--port", "0"], {
+      env: { ...process.env, IMPACT_API_KEY: key, IMPACT_BASE_URL: endpoint },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let output = "";
+    let errors = "";
+    const ready = Promise.withResolvers<string>();
+    child.stdout.on("data", (chunk) => {
+      output += chunk.toString();
+      const baseUrl = output.match(/Proxy: (http:\/\/127\.0\.0\.1:\d+\/[\w-]+)/)?.[1];
+      if (baseUrl) ready.resolve(baseUrl);
+    });
+    child.stderr.on("data", (chunk) => {
+      errors += chunk.toString();
+    });
+    const exited = once(child, "close");
+    child.once("exit", () => ready.reject(new Error(`Proxy exited before ready: ${errors}`)));
+    try {
+      const baseUrl = await ready.promise;
+      const response = await fetch(`${baseUrl}/v1/models`);
+      expect(response.status).toBe(200);
+      const models = (await response.json()) as { data: { id: string }[] };
+      expect(models.data.map((model) => model.id)).toEqual(["claude-sonnet-5-5", "gpt-6.1-sol"]);
+      expect(output).toContain(`OpenAI base URL: ${baseUrl}/v1`);
+      child.kill("SIGINT");
+      await exited;
+      expect(errors).toBe("");
+      await expect(fetch(baseUrl + "/v1/models")).rejects.toThrow();
+    } finally {
+      if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+      await exited;
+    }
   });
 
   it("launches Kilo through Impact with its full model catalog and preserves client arguments and settings", async () => {

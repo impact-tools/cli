@@ -5,6 +5,7 @@ import { Effect, Redacted } from "effect";
 import httpProxy from "http-proxy";
 import { randomUUID } from "node:crypto";
 import { createServer } from "node:https";
+import { urlToHttpOptions } from "node:url";
 
 import type { Connection } from "../../config/Connection.ts";
 
@@ -62,8 +63,11 @@ const listen = (server: Server) =>
 export const codexProxy = Effect.fn("codexProxy")(function* (connection: Connection, accountId: string) {
   const { key, cert, certificateFile } = yield* createProxyCertificate();
   const prefix = `/${randomUUID()}`;
+  const target = new URL(connection.baseUrl);
   const upstream = httpProxy.createProxyServer({
-    target: connection.baseUrl,
+    target: { ...urlToHttpOptions(target), host: target.host, port: target.port },
+    // The route allowlist supplies origin-relative paths; avoid the legacy URL parser.
+    toProxy: true,
     changeOrigin: true,
     ws: true,
     proxyTimeout: 10 * 60_000,

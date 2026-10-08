@@ -2,14 +2,38 @@ import type { AddressInfo } from "node:net";
 
 import { NodeServices } from "@effect/platform-node";
 import { Effect, Redacted } from "effect";
+import { execFile } from "node:child_process";
 import { once } from "node:events";
-import { readFile, stat } from "node:fs/promises";
+import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
 import { createServer } from "node:http";
 import { request } from "node:https";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 import { expect, it, vi } from "vitest";
 
 import { codexProxy } from "../src/clients/codex/Proxy.ts";
 import { createProxyCertificate } from "../src/clients/codex/Tls.ts";
+
+it("forwards through the bundled Codex proxy on Node when deprecated API calls are fatal", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "impact-proxy-node-test-"));
+  const entry = join(directory, "proxy.mjs");
+  const run = promisify(execFile);
+  try {
+    await run("bun", [
+      "build",
+      fileURLToPath(new URL("./fixtures/proxy-deprecation.ts", import.meta.url)),
+      "--target=node",
+      `--outfile=${entry}`,
+    ]);
+    const result = await run(process.execPath, ["--throw-deprecation", entry]);
+    expect(JSON.parse(result.stdout)).toEqual({ status: 200, body: "proxied" });
+    expect(result.stderr).toBe("");
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
 
 it("trusts a nested launch certificate and substitutes Impact credentials before forwarding", async () => {
   const seen: { url?: string; authorization?: string; cookie?: string; account?: string }[] = [];
