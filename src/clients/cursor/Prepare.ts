@@ -26,7 +26,8 @@ const bootstrapCursorSession = Effect.fnUntraced(
     const sourceDirectory = process.env.IMPACT_CURSOR_PROFILE_SOURCE ?? defaultCursorUserDataDir();
     const source = authStateFile(sourceDirectory);
     const destination = authStateFile(target);
-    if (source === destination || !(yield* fs.exists(source)) || (yield* fs.exists(destination))) return;
+    const marker = join(target, ".impact-auth-bootstrap");
+    if (source === destination || !(yield* fs.exists(source)) || (yield* fs.exists(marker))) return;
     yield* fs.makeDirectory(dirname(destination), { recursive: true, mode: 0o700 });
     yield* fs.copyFile(source, destination);
     yield* fs.chmod(destination, 0o600);
@@ -36,6 +37,8 @@ const bootstrapCursorSession = Effect.fnUntraced(
       const sidecar = `${source}${suffix}`;
       if (yield* fs.exists(sidecar)) yield* fs.copyFile(sidecar, `${destination}${suffix}`);
     }
+    yield* fs.writeFileString(marker, `${source}\n`);
+    yield* fs.chmod(marker, 0o600);
   },
   Effect.catch(() => Effect.void),
 );

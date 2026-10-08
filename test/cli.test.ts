@@ -288,14 +288,18 @@ describe("impact", () => {
     const source = join(environment.directory, "native-cursor");
     const target = join(environment.directory, "impact-cursor");
     const sourceState = join(source, "User", "globalStorage", "state.vscdb");
+    const targetState = join(target, "User", "globalStorage", "state.vscdb");
     await mkdir(join(source, "User", "globalStorage"), { recursive: true });
+    await mkdir(join(target, "User", "globalStorage"), { recursive: true });
     await writeFile(sourceState, "cursor auth state");
+    await writeFile(targetState, "empty state created by an earlier launch");
     await impact(["cursor", "."], {
       IMPACT_CURSOR_BIN: fixture,
       IMPACT_CURSOR_PROFILE_SOURCE: source,
       IMPACT_CURSOR_USER_DATA_DIR: target,
     });
-    expect(await readFile(join(target, "User", "globalStorage", "state.vscdb"), "utf8")).toBe("cursor auth state");
+    expect(await readFile(targetState, "utf8")).toBe("cursor auth state");
+    expect(await readFile(join(target, ".impact-auth-bootstrap"), "utf8")).toBe(`${sourceState}\n`);
   });
 
   it("passes Cursor help through offline and rejects flags that bypass its managed connection", async () => {
