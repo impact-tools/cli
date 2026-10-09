@@ -155,8 +155,43 @@ const BY_ID = new Map(CATALOG.map((model) => [model.id, model]));
 
 export const catalogModel = (id: string): CatalogModel | undefined => BY_ID.get(id);
 
-/** The model that answers the gateway's `web_search` unless the server names another; searches are priced at it. */
+/** The model that answers the gateway's `web_search` unless the key names another; searches are priced at it. */
 export const SEARCH_MODEL_ID = "gemini-3.8-flash";
+
+/** How hard the search model thinks: the Gemini 3 thinking levels, lowest first. */
+export const SEARCH_EFFORTS = ["low", "medium", "high"] as const;
+export type SearchEffort = (typeof SEARCH_EFFORTS)[number];
+
+export const DEFAULT_SEARCH_EFFORT: SearchEffort = "high";
+
+/** Every Gemini model can answer a search grounded in Google; newest first, as the catalog lists them. */
+export const SEARCH_MODELS: readonly CatalogModel[] = CATALOG.filter((model) => model.vendor === "google");
+
+/**
+ * The levels a search can run at on the model. Searches go through Antigravity, which serves Pro at
+ * low and high only: a medium Pro search would run as high.
+ */
+export const searchEfforts = (model: CatalogModel): readonly SearchEffort[] =>
+  SEARCH_EFFORTS.filter(
+    (effort) => model.efforts.includes(effort) && !(effort === "medium" && model.id.endsWith("-pro")),
+  );
+
+const defaultSearchModel = SEARCH_MODELS.find((model) => model.id === SEARCH_MODEL_ID);
+if (!defaultSearchModel) throw new Error(`The search model ${SEARCH_MODEL_ID} is missing from the catalog.`);
+
+/**
+ * What answers a search: the chosen model at the chosen level, the default model where the catalog
+ * no longer has the choice, and the model's highest level where it can't search at the one chosen.
+ */
+export const searchTarget = (
+  modelId: string,
+  effort: SearchEffort,
+): { readonly model: CatalogModel; readonly effort: SearchEffort } => {
+  const model = SEARCH_MODELS.find((candidate) => candidate.id === modelId);
+  if (!model) return { model: defaultSearchModel, effort: DEFAULT_SEARCH_EFFORT };
+  const efforts = searchEfforts(model);
+  return { model, effort: efforts.includes(effort) ? effort : (efforts.at(-1) ?? DEFAULT_SEARCH_EFFORT) };
+};
 
 /** Token counts as the ledger prices them; `inputTokens` includes cached and cache-write tokens. */
 export interface TokenCounts {
