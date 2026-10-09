@@ -121,11 +121,11 @@ impact cursor .
 
 `impact proxy` prints a loopback capability URL and its OpenAI-compatible `/v1` base URL. Use the full printed URL, including its random path. The proxy supplies the saved Impact key for models, usage, Responses, Chat Completions, Messages and image API requests. It accepts HTTP/1.1 and cleartext HTTP/2; the URL expires when the process stops. It is a local backend endpoint, not an HTTP CONNECT proxy. Cursor's cloud-mediated OpenAI override needs the public Impact URL rather than this loopback address.
 
-`impact cursor` supplies Cursor's native `--test-backend-url`, a dedicated persistent user-data directory and `--wait`. The backend override was found in the official macOS ARM64 Cursor 3.22.12 build. The profile defaults to `<Impact config directory>/cursor/profile`; on first launch the Desktop session database from the standard Cursor profile is copied when it exists, so an existing Cursor login is reused without moving the Impact key into Cursor storage. If no Cursor session exists, sign in once in the managed profile. Set `IMPACT_CURSOR_BIN` for another Desktop executable, `IMPACT_CURSOR_USER_DATA_DIR` for another managed profile, or `IMPACT_CURSOR_PROFILE_SOURCE` to select the source profile explicitly. Run this on the computer with Desktop installed; the remote SSH/WSL Cursor CLI cannot configure local Tab. Close the managed profile's windows before relaunching so an existing process does not retain an old backend URL.
+`impact cursor` starts the loopback proxy first, then supplies Cursor's native `--test-backend-url` and `--wait`. Cursor runs with its normal user-data directory, so settings, extensions, themes, sessions and its existing login remain in place. Set `IMPACT_CURSOR_BIN` for another Desktop executable or `IMPACT_CURSOR_USER_DATA_DIR` when an isolated profile is explicitly needed. Run this on the computer with Desktop installed; the remote SSH/WSL Cursor CLI cannot configure local Tab. If Cursor is already open, close its windows before relaunching so the existing process does not retain an old backend URL.
 
 Native `StreamCpp` requests go to Impact with Impact authorization. The gateway chooses its Cursor pool account according to the key's enabled funding sources. Other native RPCs use the editor's own Cursor login against Cursor's HTTP/1 backend. The local proxy preserves native Tab configuration while enabling the Impact-backed frontend, requesting full text, and disabling account-bound context chunks and FileSync. This avoids asking a gateway account to resolve files synced under the editor account. Tab config field numbers were checked against Cursor 3.22.12's shipped protobuf descriptors. This setup uses no custom CA or system trust changes.
 
-For a separately launched Desktop, keep `impact proxy` open and pass its **Cursor backend** URL through `--test-backend-url=<URL>`, together with a separate `--user-data-dir` and `--wait`. Closing the waited-for files/window or stopping Impact ends the managed proxy; keep it running for ongoing suggestions.
+For a separately launched Desktop, keep `impact proxy` open and pass its **Cursor backend** URL through `--test-backend-url=<URL>` and `--wait`. Add `--user-data-dir` only when an isolated Cursor profile is desired. Closing the waited-for files/window or stopping Impact ends the managed proxy; keep it running for ongoing suggestions.
 
 Tests exercise the real CLI launcher, native config replies, opaque Connect streaming over HTTP/1.1 and HTTP/2, credential substitution, cancellation and cleanup. A live Desktop suggestion has not been verified in this environment. Other Cursor versions may change these internal flags or descriptors. The native gateway route remains `https://api.impactllm.com/aiserver.v1.AiService/StreamCpp`; the OpenAI base-URL setting configures chat and agent separately, and the launcher does not replace the Desktop model picker.
 
@@ -133,7 +133,7 @@ Tests exercise the real CLI launcher, native config replies, opaque Connect stre
 
 - `clients/Launch.ts` lists the clients and runs the chosen one; `clients/Client.ts` holds what they share.
 - `clients/claude/` owns Claude settings, the model picker and the status line.
-- `clients/cursor/` owns the native Desktop backend, Tab configuration and dedicated launch profile.
+- `clients/cursor/` owns the native Desktop backend and Tab configuration.
 - `clients/codex/` owns Codex authentication, profiles, model catalog, loopback proxy, and TLS certificates.
 - `clients/opencode/` owns the launch overlay and model definitions, prices and reasoning variants shared by OpenCode and Kilo.
 - `commands/` defines the CLI commands; `Command.ts` assembles them. `impact helper token` and `impact helper status-line` are unlisted commands that clients call during a launch.
@@ -154,8 +154,7 @@ Expected failures are `CliError`s with a one-line message; `main.ts` prints it a
 | `IMPACT_MODEL`                                                                                         | Initial model from the enabled catalog                     |
 | `IMPACT_CONFIG_DIR`                                                                                    | CLI credential directory                                   |
 | `IMPACT_CLAUDE_BIN`, `IMPACT_CODEX_BIN`, `IMPACT_CURSOR_BIN`, `IMPACT_KILO_BIN`, `IMPACT_OPENCODE_BIN` | Native client executable                                   |
-| `IMPACT_CURSOR_USER_DATA_DIR`                                                                          | Persistent Cursor profile used by the launcher             |
-| `IMPACT_CURSOR_PROFILE_SOURCE`                                                                         | Existing Cursor profile whose Desktop auth state is reused |
+| `IMPACT_CURSOR_USER_DATA_DIR`                                                                          | Optional Cursor profile override; the default is Cursor's normal profile |
 | `IMPACT_DISABLE_UPDATE_CHECK`                                                                          | Disable the interactive npm version check                  |
 | `CODEX_HOME`                                                                                           | Existing Codex configuration and authentication directory  |
 

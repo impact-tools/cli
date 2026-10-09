@@ -260,16 +260,17 @@ describe("impact", () => {
     expect(result.stderr).toBe("");
   });
 
-  it.each([false, true])("launches Cursor with a scoped backend and persistent profile (custom=%s)", async (custom) => {
-    const directory = join(environment.directory, custom ? "custom-profile" : "cursor/profile");
+  it.each([false, true])("launches Cursor with the existing profile unless explicitly overridden (custom=%s)", async (custom) => {
+    const directory = join(environment.directory, "custom-profile");
     const result = await impact(["cursor", "--new-window", "a path with spaces"], {
       IMPACT_CURSOR_BIN: fixture,
       ...(custom ? { IMPACT_CURSOR_USER_DATA_DIR: directory } : {}),
       VSCODE_IPC_HOOK_CLI: "existing-cursor-ipc",
     });
     const body = JSON.parse(result.stdout);
-    expect(body.args.slice(0, 2)).toEqual(["--user-data-dir", directory]);
-    expect(body.args.slice(3)).toEqual(["--wait", "--new-window", "a path with spaces"]);
+    const backendIndex = custom ? 2 : 0;
+    expect(custom ? body.args.slice(0, 2) : body.args.slice(0, 0)).toEqual(custom ? ["--user-data-dir", directory] : []);
+    expect(body.args.slice(backendIndex + 1)).toEqual(["--wait", "--new-window", "a path with spaces"]);
     expect(body.args.join(" ")).not.toContain(key);
     expect(body.key).toBeUndefined();
     expect(body.cursorIpc).toBeUndefined();
@@ -277,29 +278,24 @@ describe("impact", () => {
       "claude-sonnet-5-5",
       "gpt-6.1-sol",
     ]);
-    expect((await stat(directory)).isDirectory()).toBe(true);
+    if (custom) expect((await stat(directory)).isDirectory()).toBe(true);
     expect(requests).toEqual(["/v1/models"]);
-    const backend = body.args[2].slice("--test-backend-url=".length);
+    const backend = body.args[backendIndex].slice("--test-backend-url=".length);
     expect(new URL(backend).hostname).toBe("127.0.0.1");
     await expect(fetch(backend + "/v1/models")).rejects.toThrow();
   });
 
-  it("bootstraps an existing Cursor Desktop session into the managed profile", async () => {
-    const source = join(environment.directory, "native-cursor");
+  it("does not copy Cursor state when a custom profile is selected", async () => {
     const target = join(environment.directory, "impact-cursor");
-    const sourceState = join(source, "User", "globalStorage", "state.vscdb");
     const targetState = join(target, "User", "globalStorage", "state.vscdb");
-    await mkdir(join(source, "User", "globalStorage"), { recursive: true });
     await mkdir(join(target, "User", "globalStorage"), { recursive: true });
-    await writeFile(sourceState, "cursor auth state");
-    await writeFile(targetState, "empty state created by an earlier launch");
+    await writeFile(targetState, "custom profile state");
     await impact(["cursor", "."], {
       IMPACT_CURSOR_BIN: fixture,
-      IMPACT_CURSOR_PROFILE_SOURCE: source,
       IMPACT_CURSOR_USER_DATA_DIR: target,
     });
-    expect(await readFile(targetState, "utf8")).toBe("cursor auth state");
-    expect(await readFile(join(target, ".impact-auth-bootstrap"), "utf8")).toBe(`${sourceState}\n`);
+    expect(await readFile(targetState, "utf8")).toBe("custom profile state");
+    await expect(readFile(join(target, ".impact-auth-bootstrap"))).rejects.toMatchObject({ code: "ENOENT" });
   });
 
   it("passes Cursor help through offline and rejects flags that bypass its managed connection", async () => {
