@@ -73,7 +73,7 @@ export const KeyRouting = Schema.Struct({
 export type KeyRouting = typeof KeyRouting.Type;
 
 export const DEFAULT_KEY_ROUTING: KeyRouting = {
-  enabled: true,
+  enabled: false,
   targets: ["gpt-6.1-sol", "gpt-5.6-sol", "gpt-5.6-luna"],
   ceiling: "max",
 };
