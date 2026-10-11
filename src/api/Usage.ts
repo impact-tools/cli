@@ -1,22 +1,14 @@
-import { Schema, type Duration } from "effect";
+import type { Duration } from "effect";
 
 import type { Connection } from "../config/Connection.ts";
 
+import { UsageWallet } from "../schemas/V1.ts";
 import { getJson } from "./Http.ts";
 
-const Usage = Schema.Struct({
-  currency: Schema.Literal("USD"),
-  account: Schema.optional(Schema.Struct({ id: Schema.String, email: Schema.String })),
-  credits: Schema.Struct({
-    balance: Schema.String,
-    reserved: Schema.optional(Schema.String),
-    total: Schema.optional(Schema.String),
-  }),
-});
-export type Usage = typeof Usage.Type;
+export type Usage = UsageWallet;
 
 export const fetchUsage = (connection: Connection, timeout?: Duration.Input) =>
-  getJson(connection, "/v1/usage", Usage, { timeout, invalid: "Impact returned an invalid wallet balance." });
+  getJson(connection, "/v1/usage", UsageWallet, { timeout, invalid: "Impact returned an invalid wallet balance." });
 
 const clean = (value: string) => value.replace(/[\x00-\x1f\x7f-\x9f]/g, " ");
 
