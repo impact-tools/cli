@@ -5,7 +5,23 @@ export type UsdMicros = number;
 
 export const USD_MICROS = 1_000_000;
 
-const TokenPrice = Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0));
+/**
+ * Billionths of a micro-dollar: a price per million tokens is micro-dollars per token, so this unit
+ * holds every price in whole numbers and the ledger adds them up without floating-point noise.
+ */
+export const PRICE_NANOS = 1_000_000_000;
+
+/** A price in {@link PRICE_NANOS} per token; exact for every price {@link TokenPrices} accepts. */
+export const priceNanos = (price: number): number => Math.round(price * PRICE_NANOS);
+
+/** Whole billionths of a micro-dollar per token, so the ledger can add prices up exactly. */
+const isExactPrice = Schema.makeFilter(
+  (price: number) =>
+    (Number.isSafeInteger(priceNanos(price)) && priceNanos(price) / PRICE_NANOS === price) ||
+    "a token price takes at most nine decimal places",
+);
+
+const TokenPrice = Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0), isExactPrice);
 
 /** One set of token prices in USD per million tokens: a vendor's list price or our tariff. */
 export const TokenPrices = Schema.Struct({
@@ -41,7 +57,5 @@ export const SIDECAR_PRICES = {
  * model's tariff share of list (`tariffFeeMicros`), like its tokens.
  */
 export const ANTHROPIC_WEB_SEARCH_MICROS = 10_000;
-
-export type SidecarKind = keyof typeof SIDECAR_PRICES;
 
 export const usdFromMicros = (micros: UsdMicros) => micros / USD_MICROS;

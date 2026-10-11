@@ -5,7 +5,7 @@ import googleModels from "./catalog/google.json";
 import openaiModels from "./catalog/openai.json";
 import uncensoredModels from "./catalog/uncensored.json";
 import xaiModels from "./catalog/xai.json";
-import { MODEL_PRICE_MULTIPLIER, TokenPrices, USD_MICROS, type UsdMicros } from "./Pricing.ts";
+import { MODEL_PRICE_MULTIPLIER, PRICE_NANOS, priceNanos, TokenPrices, USD_MICROS, type UsdMicros } from "./Pricing.ts";
 
 /**
  * The model catalog: one JSON file per vendor under `catalog/`, listing each model with its vendor's
@@ -202,22 +202,29 @@ export interface TokenCounts {
   readonly outputTokens: number;
 }
 
+const NANOS = BigInt(PRICE_NANOS);
+
+/** Tokens at a price, in billionths of a micro-dollar: integers, so the sum is exact. */
+const tokenNanos = (tokens: number, price: number): bigint => BigInt(Math.trunc(tokens)) * BigInt(priceNanos(price));
+
 /**
  * What the tokens cost at the public tariff. A price per million tokens is exactly the price in micros
- * per token, so this is a plain dot product, rounded up to the next micro.
+ * per token, so this is a dot product, added up in whole billionths of a micro and rounded up to the
+ * next micro once.
  */
 export const tokenCostMicros = (model: CatalogModel, tokens: TokenCounts): UsdMicros => {
   const cached = Math.min(tokens.cachedInputTokens, tokens.inputTokens);
   const written = Math.min(tokens.cacheWriteTokens, tokens.inputTokens - cached);
   const written1h = Math.min(tokens.cacheCreation1hTokens ?? 0, written);
   const uncached = tokens.inputTokens - cached - written;
-  return Math.ceil(
-    uncached * model.inputPrice +
-      cached * model.cachedInputPrice +
-      (written - written1h) * model.cacheWritePrice +
-      written1h * (model.cacheWrite1hPrice ?? model.cacheWritePrice) +
-      tokens.outputTokens * model.outputPrice,
-  );
+  const nanos =
+    tokenNanos(uncached, model.inputPrice) +
+    tokenNanos(cached, model.cachedInputPrice) +
+    tokenNanos(written - written1h, model.cacheWritePrice) +
+    tokenNanos(written1h, model.cacheWrite1hPrice ?? model.cacheWritePrice) +
+    tokenNanos(tokens.outputTokens, model.outputPrice);
+  const micros = nanos / NANOS;
+  return Number(nanos % NANOS > 0n ? micros + 1n : micros);
 };
 
 /** The share of its vendor's list prices the model's tariff charges, on blended prices. */
