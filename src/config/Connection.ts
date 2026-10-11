@@ -5,7 +5,15 @@ import { CliError } from "../Errors.ts";
 export const DEFAULT_BASE_URL = "https://api.impactllm.com";
 
 const ApiKey = Schema.RedactedFromValue(Schema.String.check(Schema.isPattern(/^sk-imp-[0-9A-Za-z]{43}$/)));
-export const Connection = Schema.Struct({ baseUrl: Schema.String, apiKey: ApiKey });
+export const Connection = Schema.Struct({
+  baseUrl: Schema.String,
+  apiKey: ApiKey,
+  /**
+   * Set when `impact login` created the key through the browser: the CLI revokes that key when a new
+   * login replaces it or on `impact logout`. A pasted key has none and is never revoked.
+   */
+  createdKey: Schema.optional(Schema.Struct({ id: Schema.String })),
+});
 export type Connection = typeof Connection.Type;
 
 const loopback = (host: string) => ["localhost", "127.0.0.1", "[::1]"].includes(host) || host.endsWith(".localhost");

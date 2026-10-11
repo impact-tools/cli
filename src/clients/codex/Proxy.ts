@@ -9,11 +9,10 @@ import { urlToHttpOptions } from "node:url";
 
 import type { Connection } from "../../config/Connection.ts";
 
+import { CLI_VERSION, VERSION_HEADER } from "../../api/Http.ts";
 import { CliError } from "../../Errors.ts";
+import { isCodexRoute, pathname } from "./Routes.ts";
 import { createProxyCertificate } from "./Tls.ts";
-
-const FORWARDED =
-  /^\/(?:v1\/(?:models|responses(?:\/compact)?)|backend-api\/codex\/(?:models|responses(?:\/compact)?)|api\/codex\/usage)(?:\?|$)/;
 
 export type Route = { readonly reply: unknown } | { readonly forward: string } | undefined;
 
@@ -22,7 +21,7 @@ export function route(url: string, prefix: string, replies: Readonly<Record<stri
   if (!url.startsWith(`${prefix}/`)) return undefined;
   const path = url.slice(prefix.length);
   if (Object.hasOwn(replies, path)) return { reply: replies[path] };
-  return FORWARDED.test(path) ? { forward: path } : undefined;
+  return isCodexRoute(path) ? { forward: path } : undefined;
 }
 
 /** ChatGPT account endpoints Codex polls; Impact answers them with the key owner's identity. */
@@ -74,6 +73,7 @@ export const codexProxy = Effect.fn("codexProxy")(function* (connection: Connect
   });
   const withImpactCredentials = (request: ClientRequest) => {
     request.setHeader("authorization", `Bearer ${Redacted.value(connection.apiKey)}`);
+    request.setHeader(VERSION_HEADER, CLI_VERSION);
     for (const header of ["cookie", "chatgpt-account-id", "openai-organization", "x-api-key"])
       request.removeHeader(header);
   };
@@ -112,8 +112,7 @@ export const codexProxy = Effect.fn("codexProxy")(function* (connection: Connect
   });
   server.on("upgrade", (request, socket, head) => {
     const target = route(request.url ?? "", prefix);
-    if (!target || !("forward" in target) || !target.forward.split("?")[0]!.endsWith("/responses"))
-      return socket.destroy();
+    if (!target || !("forward" in target) || !pathname(target.forward).endsWith("/responses")) return socket.destroy();
     request.url = target.forward;
     upstream.ws(request, socket, head);
   });

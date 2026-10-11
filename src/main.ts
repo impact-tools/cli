@@ -16,6 +16,17 @@ import { welcome } from "./ui/Welcome.ts";
 
 if (process.env.IMPACT_LAUNCH_CWD) process.chdir(process.env.IMPACT_LAUNCH_CWD);
 
+/**
+ * Closing the terminal or IDE sends SIGHUP, which the runtime leaves alone; stopping as on Ctrl+C
+ * lets the launch remove its temporary Codex home and status files.
+ */
+const interruptOnHangup = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+  Effect.withFiber<A, E, R>((fiber) => {
+    const hangup = () => fiber.interruptUnsafe(fiber.id);
+    process.on("SIGHUP", hangup);
+    return effect.pipe(Effect.ensuring(Effect.sync(() => process.off("SIGHUP", hangup))));
+  });
+
 Effect.suspend(() => {
   const output = makeOutput();
   // Helpers and native clients never enter a branded screen; only human output requests a banner.
@@ -40,19 +51,21 @@ Effect.suspend(() => {
     args.length === 0
       ? welcomeAccount.pipe(Effect.flatMap((account) => Console.log(welcome(command, output, account))))
       : Command.runWith(command, { version })(args);
-  return updateCheck.pipe(
-    Effect.andThen(run),
-    Effect.catchTag("CliError", (error) =>
-      Console.error(output.error(error.message)).pipe(
-        Effect.andThen(
-          Effect.sync(() => {
-            process.exitCode = 1;
-          }),
+  return interruptOnHangup(
+    updateCheck.pipe(
+      Effect.andThen(run),
+      Effect.catchTag("CliError", (error) =>
+        Console.error(output.error(error.message)).pipe(
+          Effect.andThen(
+            Effect.sync(() => {
+              process.exitCode = 1;
+            }),
+          ),
         ),
       ),
+      Effect.provide([NodeServices.layer, Http.layer, CliOutput.layer(makeFormatter(output))]),
+      Effect.provideService(Output, output),
+      Effect.provideService(Prompt.Theme, promptTheme(output.stdout)),
     ),
-    Effect.provide([NodeServices.layer, Http.layer, CliOutput.layer(makeFormatter(output))]),
-    Effect.provideService(Output, output),
-    Effect.provideService(Prompt.Theme, promptTheme(output.stdout)),
   );
 }).pipe(NodeRuntime.runMain);

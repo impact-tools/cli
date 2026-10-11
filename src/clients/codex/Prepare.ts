@@ -27,9 +27,16 @@ export const prepareCodex = Effect.fn("prepareCodex")(function* ({ executable, a
     });
   const account = yield* impactCodexAuth(yield* fetchUsage(connection));
   const proxy = yield* codexProxy(connection, account.accountId);
-  const profile = yield* configureCodex(model.slug, catalog, proxy.baseUrl, account.directory);
-  // The stdio server has no --profile option; runtime commands use the native profile loader.
-  const clientArgs = args[0] === "app-server" ? profile.overrides : ["--no-daemon", "--profile", profile.name];
+  // The stdio server has no --profile option, so its config is the launch home's own config.toml.
+  const appServer = args[0] === "app-server";
+  const profile = yield* configureCodex(
+    model.slug,
+    catalog,
+    proxy.baseUrl,
+    account.directory,
+    appServer ? "home" : "profile",
+  );
+  const clientArgs = appServer ? [] : ["--no-daemon", "--profile", profile.name];
   return {
     args: [...clientArgs, ...args],
     env: {

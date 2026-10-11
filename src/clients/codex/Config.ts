@@ -1,5 +1,5 @@
 import { Effect, FileSystem } from "effect";
-import { flattenObject, toMerged } from "es-toolkit";
+import { toMerged } from "es-toolkit";
 import { randomUUID } from "node:crypto";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
@@ -10,14 +10,17 @@ import { CliError, mapPlatformError } from "../../Errors.ts";
 export const codexHome = () => resolve(process.env.CODEX_HOME ?? join(homedir(), ".codex"));
 
 /**
- * Writes a temporary profile: the user's `config.toml` with Impact's settings on top.
- * `overrides` carries the same settings as `-c` flags for commands without `--profile`.
+ * Writes the user's `config.toml` with Impact's settings on top: by default as a temporary profile
+ * that `--profile <name>` selects. `home` instead replaces `config.toml` itself, for the launch's own
+ * Codex home and commands without `--profile` (`app-server`): the proxy URL carries its secret, so
+ * it stays in files only the user can read, never in the process arguments.
  */
 export const configureCodex = Effect.fn("configureCodex")(function* (
   model: string,
   catalog: unknown,
   proxyUrl: string,
   directory = codexHome(),
+  target: "profile" | "home" = "profile",
 ) {
   const fs = yield* FileSystem.FileSystem;
   yield* fs.makeDirectory(directory, { recursive: true, mode: 0o700 });
@@ -49,13 +52,20 @@ export const configureCodex = Effect.fn("configureCodex")(function* (
     sqlite_home: existing.sqlite_home ?? process.env.CODEX_SQLITE_HOME ?? codexHome(),
     features: { fast_mode: true, apps: false },
   };
+  const merged = stringify(toMerged(existing, impact));
   const name = `impact-${randomUUID()}`;
+  if (target === "home") {
+    if (resolve(directory) === codexHome())
+      return yield* new CliError({ message: "Impact never rewrites your own Codex config." });
+    // The rename replaces the link to the user's config.toml, never the file it points at.
+    const temporary = yield* fs.makeTempFileScoped({ directory, prefix: ".impact-config-", suffix: ".toml" });
+    yield* fs.chmod(temporary, 0o600);
+    yield* fs.writeFileString(temporary, merged);
+    yield* fs.rename(temporary, join(directory, "config.toml"));
+    return { name };
+  }
   const profilePath = join(directory, `${name}.config.toml`);
   yield* Effect.addFinalizer(() => fs.remove(profilePath, { force: true }).pipe(Effect.ignore));
-  yield* fs.writeFileString(profilePath, stringify(toMerged(existing, impact)), { mode: 0o600 });
-  const overrides = Object.entries(flattenObject(impact)).flatMap(([key, value]) => [
-    "-c",
-    `${key}=${JSON.stringify(value)}`,
-  ]);
-  return { name, overrides };
+  yield* fs.writeFileString(profilePath, merged, { mode: 0o600 });
+  return { name };
 }, mapPlatformError("Cannot write the Codex profile"));

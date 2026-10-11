@@ -12,7 +12,7 @@ impact cursor
 impact status
 ```
 
-Login uses Better Auth device authorization: approve the terminal's code in your browser. The CLI stores an Impact API key in the OS configuration directory with owner-only permissions. `impact logout` removes the saved key locally; revoke it in Impact's API keys page to invalidate it.
+Login uses Better Auth device authorization: approve the terminal's code in your browser. The CLI stores an Impact API key in the OS configuration directory with owner-only permissions. A repeated `impact login` revokes the key the previous login created once the new one is saved, and `impact logout` revokes it before removing the saved login (`--keep-key` keeps it). A key imported with `--api-key` or `--key-stdin` is never revoked by the CLI. Revocation uses the key's own secret (`POST /v1/keys/self/revoke`); when it fails, the CLI warns and links the API keys page instead of failing.
 
 For an existing key, use `impact login --api-key` for a hidden prompt or `impact login --key-stdin`. Native client arguments pass through unchanged, including `impact claude -p "hello"` and `impact codex exec "hello"`.
 
@@ -80,7 +80,7 @@ Inside Codex, `/status` identifies the account as `Impact · <email>` and shows 
 
 The launcher configures a named `impact` Responses provider instead of overriding `openai_base_url`. This avoids Codex's base-URL warning and loads every enabled public model, including Claude, Gemini and GLM. The provider uses HTTP because Codex's WebSocket setting applies to the whole provider and the other families use the HTTP translation routes. GPT HTTP Responses still preserves its native payload and SSE. In Codex 0.160.0, remote compaction is restricted to built-in OpenAI/Azure providers; the custom provider uses local compaction. Account and usage polling remain enabled through the isolated authentication profile. The temporary account has no ChatGPT workspace ID: workspace discovery would otherwise overwrite its email with a plan-only account display.
 
-The `app-server` subcommand lacks the native `--profile` option. It receives equivalent scoped configuration overrides instead. Interactive launches select embedded mode explicitly and do not produce the shared-server configuration warning.
+The `app-server` subcommand lacks the native `--profile` option. Its launch home gets the merged configuration as its own `config.toml` instead of `-c` overrides, so the proxy's secret URL never appears in the process arguments. Interactive launches select embedded mode explicitly and do not produce the shared-server configuration warning.
 
 ## Kilo Code configuration
 

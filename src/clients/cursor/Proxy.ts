@@ -1,17 +1,18 @@
 import type { ClientRequest, IncomingHttpHeaders, IncomingMessage, ServerResponse } from "node:http";
-import type { Http2ServerRequest } from "node:http2";
 import type { Server, Socket } from "node:net";
 
 import { Effect, Redacted } from "effect";
 import { randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import { Agent as HttpAgent, createServer as httpServer, request as httpRequest } from "node:http";
-import { createServer as http2Server, Http2ServerResponse } from "node:http2";
+import { createServer as http2Server, Http2ServerRequest, Http2ServerResponse } from "node:http2";
 import { Agent as HttpsAgent, request as httpsRequest } from "node:https";
 import { connect as netConnect, createServer as netServer } from "node:net";
 import { gunzipSync } from "node:zlib";
 
 import type { Connection } from "../../config/Connection.ts";
 
+import { CLI_VERSION, VERSION_HEADER } from "../../api/Http.ts";
 import { CliError } from "../../Errors.ts";
 import { configureTab } from "./TabConfig.ts";
 
@@ -43,7 +44,7 @@ const GATEWAY_HEADERS = new Set([
   "openai-organization",
 ]);
 const API_PATH =
-  /^\/v1\/(?:models|usage(?:\/spend)?|responses(?:\/compact)?|chat\/completions|messages|images\/(?:generations|edits))(?:\?|$)/;
+  /^\/v1\/(?:models(?:\/[^/?]+)?|usage(?:\/spend)?|responses(?:\/compact)?|chat\/completions|messages(?:\/count_tokens)?|images\/(?:generations|edits))(?:\?|$)/;
 const NATIVE_PATH = /^\/(?:aiserver|agent|origin)\.v1\.[A-Za-z]+Service\/[A-Za-z][A-Za-z0-9]*(?:\?|$)/;
 
 type Request = IncomingMessage | Http2ServerRequest;
@@ -52,7 +53,31 @@ type Response = ServerResponse | Http2ServerResponse;
 export interface ProxyOptions {
   readonly port?: number;
   readonly cursorOrigin?: string;
+  /** Refuse loopback connections opened by another user, where the system can tell (Linux). */
+  readonly sameUserOnly?: boolean;
 }
+
+/** Whether the proxy sends `path` (query included) to Impact's API with the key. */
+export const isApiPath = (path: string) => API_PATH.test(path);
+
+const hexPort = (port: number) => port.toString(16).toUpperCase().padStart(4, "0");
+
+/**
+ * The user that opened a loopback connection, from the kernel's IPv4 socket table: the peer's
+ * entry has the connection's remote port as its local one. Undefined where the table can't be
+ * read or no longer lists the peer.
+ */
+export const loopbackPeerUid = async (socket: Socket): Promise<number | undefined> => {
+  if (process.platform !== "linux" || !socket.remotePort || !socket.localPort) return undefined;
+  const table = await readFile("/proc/net/tcp", "utf8").catch(() => "");
+  const local = new RegExp(`^[0-9A-F]{6}7F:${hexPort(socket.remotePort)}$`);
+  const remote = new RegExp(`^[0-9A-F]{6}7F:${hexPort(socket.localPort)}$`);
+  for (const line of table.split("\n").slice(1)) {
+    const fields = line.trim().split(/\s+/);
+    if (local.test(fields[1] ?? "") && remote.test(fields[2] ?? "")) return Number(fields[7]);
+  }
+  return undefined;
+};
 
 const cleanHeaders = (headers: IncomingHttpHeaders, gateway = false) => {
   const connection = headers.connection?.split(",").map((name) => name.trim().toLowerCase()) ?? [];
@@ -92,7 +117,13 @@ const listen = (server: Server, port: number) =>
     });
   });
 
-/** A capability URL exposes API routes and Cursor's native backend on loopback only. */
+/**
+ * A capability URL exposes API routes and Cursor's native backend on loopback only. Cursor learns
+ * the URL from its arguments, which other local users can list, so a launch also checks who opens
+ * each connection (`sameUserOnly`). The public port relays each connection to an internal HTTP/1
+ * or HTTP/2 server on loopback; their ports are just as visible, so they serve relayed connections
+ * only.
+ */
 export const cursorProxy = Effect.fn("cursorProxy")(function* (connection: Connection, options: ProxyOptions = {}) {
   const port = options.port ?? 0;
   if (!Number.isInteger(port) || port < 0 || port > 65_535)
@@ -101,16 +132,20 @@ export const cursorProxy = Effect.fn("cursorProxy")(function* (connection: Conne
   const prefix = `/${randomUUID()}`;
   const sockets = new Set<Socket>();
   const requests = new Set<ClientRequest>();
+  /** `<internal server port>:<relay port>` of each open relay from the public port. */
+  const relays = new Set<string>();
   const httpAgent = new HttpAgent({ keepAlive: true });
   const httpsAgent = new HttpsAgent({ keepAlive: true });
   const handle = (request: Request, response: Response) => {
+    if (!relays.has(`${request.socket.localPort}:${request.socket.remotePort}`))
+      return void (request instanceof Http2ServerRequest ? request.stream.session : request.socket)?.destroy();
     const url = request.url ?? "";
     if (!url.startsWith(`${prefix}/`)) return reply(response, 404, "Route not found.");
     const path = url.slice(prefix.length);
     const pathname = path.split("?")[0];
     const completion = pathname === COMPLETION_PATH;
     const config = pathname === CONFIG_PATH;
-    const gateway = completion || API_PATH.test(path);
+    const gateway = completion || isApiPath(path);
     if (!gateway && !NATIVE_PATH.test(path)) return reply(response, 404, "Route not found.");
     if ((completion || config || pathname === FILESYNC_ENABLED_PATH) && request.method !== "POST")
       return reply(response, 405, "Use POST for Cursor Tab.");
@@ -133,7 +168,10 @@ export const cursorProxy = Effect.fn("cursorProxy")(function* (connection: Conne
     const target = new URL(gateway ? connection.baseUrl : (options.cursorOrigin ?? CURSOR_ORIGIN));
     const outgoingUrl = new URL(path, target);
     const headers = cleanHeaders(request.headers, gateway);
-    if (gateway) headers.authorization = `Bearer ${Redacted.value(connection.apiKey)}`;
+    if (gateway) {
+      headers.authorization = `Bearer ${Redacted.value(connection.apiKey)}`;
+      headers[VERSION_HEADER] = CLI_VERSION;
+    }
     if (config) headers["accept-encoding"] = "identity";
     const transport = target.protocol === "https:" ? httpsRequest : httpRequest;
     let incoming: IncomingMessage | undefined;
@@ -250,12 +288,20 @@ export const cursorProxy = Effect.fn("cursorProxy")(function* (connection: Conne
       socket.once("close", () => upstream.destroy());
       upstream.once("error", () => socket.destroy());
       upstream.once("connect", () => {
+        const relay = `${upstream.remotePort}:${upstream.localPort}`;
+        relays.add(relay);
+        upstream.once("close", () => relays.delete(relay));
         upstream.write(head);
         socket.pipe(upstream).pipe(socket);
         socket.resume();
       });
     };
-    socket.on("data", read);
+    if (!options.sameUserOnly || process.getuid === undefined) return void socket.on("data", read);
+    const uid = process.getuid();
+    void loopbackPeerUid(socket).then((peer) => {
+      if (peer !== undefined && peer !== uid) socket.destroy();
+      else if (!socket.destroyed) socket.on("data", read);
+    });
   });
   yield* Effect.addFinalizer(() =>
     Effect.sync(() => {

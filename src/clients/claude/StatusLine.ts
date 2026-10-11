@@ -1,6 +1,7 @@
 import { Effect, FileSystem, Schedule, Schema } from "effect";
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import type { Connection } from "../../config/Connection.ts";
@@ -9,6 +10,9 @@ import type { StatusLine } from "./Config.ts";
 import { fetchUsage, usageSummary } from "../../api/Usage.ts";
 import { mapPlatformError } from "../../Errors.ts";
 import { helperCommand } from "../../process/Self.ts";
+import { makeOwnedDirectory, removeOrphans } from "../Scratch.ts";
+
+const PREFIX = "impact-claude-status-";
 
 const Snapshot = Schema.Struct({ line: Schema.String, command: Schema.optional(Schema.String) });
 
@@ -18,7 +22,8 @@ export const prepareStatusLine = Effect.fn("prepareStatusLine")(function* (
   existing: StatusLine | undefined,
 ) {
   const fs = yield* FileSystem.FileSystem;
-  const directory = yield* fs.makeTempDirectoryScoped({ prefix: "impact-claude-status-" });
+  yield* removeOrphans(tmpdir(), PREFIX);
+  const directory = yield* makeOwnedDirectory({ directory: tmpdir(), prefix: PREFIX });
   const path = join(directory, "status.json");
   const temporary = join(directory, "status.tmp");
   const refresh = fetchUsage(connection, "2 seconds").pipe(

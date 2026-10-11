@@ -6,12 +6,14 @@ import { RpcClient, RpcSerialization } from "effect/rpc";
 import { hostname } from "node:os";
 import open from "open";
 
+import { USER_AGENT } from "../api/Http.ts";
 import { apiKey, type Connection } from "../config/Connection.ts";
 import { CliError } from "../Errors.ts";
 import { DEFAULT_FUNDING } from "../schemas/Billing.ts";
 import { ImpactRpcs } from "../schemas/Rpcs.ts";
 import { Output } from "../ui/Output.ts";
 import { withProgress } from "../ui/Progress.ts";
+import { revokeOrWarn } from "./Revoke.ts";
 
 export const CLIENT_ID = "impact-cli";
 const grantType = "urn:ietf:params:oauth:grant-type:device_code";
@@ -20,7 +22,7 @@ export const createDeviceClient = (baseUrl: string) =>
   createAuthClient({
     baseURL: `${baseUrl}/api/auth`,
     plugins: [deviceAuthorizationClient()],
-    fetchOptions: { redirect: "error", timeout: 15_000 },
+    fetchOptions: { redirect: "error", timeout: 15_000, headers: { "user-agent": USER_AGENT } },
   });
 
 const unreachable = () => new CliError({ message: "Cannot reach Impact to authorize this device." });
@@ -70,7 +72,7 @@ const createApiKey = Effect.fnUntraced(
       monthlyLimitMicros: null,
       funding: [...DEFAULT_FUNDING],
     });
-    return created.secret;
+    return { id: created.key.id, secret: created.secret };
   },
   Effect.scoped,
   (effect, baseUrl, session) =>
@@ -78,14 +80,25 @@ const createApiKey = Effect.fnUntraced(
       effect,
       RpcClient.layerProtocolHttp({
         url: `${baseUrl}/rpc`,
-        transformClient: HttpClient.mapRequest(HttpClientRequest.bearerToken(session)),
+        transformClient: HttpClient.mapRequest((request) =>
+          request.pipe(HttpClientRequest.bearerToken(session), HttpClientRequest.setHeader("user-agent", USER_AGENT)),
+        ),
       }).pipe(Layer.provide(RpcSerialization.layerNdjson)),
     ),
   Effect.mapError((error) => new CliError({ message: `Impact could not create an API key: ${error.message}` })),
   Effect.timeoutOrElse({ duration: "30 seconds", orElse: () => Effect.fail(unreachable()) }),
 );
 
-export const deviceLogin = Effect.fn("deviceLogin")(function* (baseUrl: string, noBrowser: boolean) {
+/**
+ * Signs this device in and creates its key, then hands the connection to `keep` while the device
+ * session is still open. When the connection cannot be kept, the new key revokes itself before the
+ * session signs out, so a failed login leaves no live key behind.
+ */
+export const deviceLogin = Effect.fn("deviceLogin")(function* <A, E, R>(
+  baseUrl: string,
+  noBrowser: boolean,
+  keep: (connection: Connection) => Effect.Effect<A, E, R>,
+) {
   const client = createDeviceClient(baseUrl);
   const requested = yield* Effect.tryPromise({
     try: (signal) => client.device.code({ client_id: CLIENT_ID }, { signal }),
@@ -112,12 +125,19 @@ export const deviceLogin = Effect.fn("deviceLogin")(function* (baseUrl: string, 
       Effect.catch(() => output.notice("warning", "Open the URL above in your browser to continue.")),
     );
   const session = yield* withProgress("Waiting for approval…", waitForDeviceToken(client, code));
-  const key = yield* createApiKey(baseUrl, session).pipe(
+  return yield* createApiKey(baseUrl, session).pipe(
+    Effect.flatMap((created) =>
+      apiKey(Redacted.value(created.secret)).pipe(
+        Effect.flatMap((secret) => keep({ baseUrl, apiKey: secret, createdKey: { id: created.id } })),
+        Effect.onError(() =>
+          revokeOrWarn(baseUrl, created.secret, "The login failed after Impact created its key.").pipe(Effect.ignore),
+        ),
+      ),
+    ),
     Effect.ensuring(
       Effect.tryPromise(() => client.signOut({}, { headers: { authorization: `Bearer ${session}` } })).pipe(
         Effect.ignore,
       ),
     ),
   );
-  return { baseUrl, apiKey: yield* apiKey(Redacted.value(key)) } satisfies Connection;
 });

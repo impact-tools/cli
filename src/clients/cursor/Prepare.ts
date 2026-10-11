@@ -23,9 +23,11 @@ export const prepareCursor = Effect.fn("prepareCursor")(function* ({ executable,
     return yield* new CliError({
       message: "Impact supplies Cursor's backend and profile. Use IMPACT_CURSOR_USER_DATA_DIR to select a profile.",
     });
-  const proxy = yield* cursorProxy(connection);
+  const proxy = yield* cursorProxy(connection, { sameUserOnly: true });
   const output = yield* Output;
-  if (output.stdout.decorative) yield* output.notice("primary", `Cursor proxy started at ${proxy.baseUrl}`);
+  // The path is the proxy's secret: only Cursor's arguments carry it.
+  if (output.stdout.decorative)
+    yield* output.notice("primary", `Cursor proxy started on ${new URL(proxy.baseUrl).host}`);
   const profile = process.env.IMPACT_CURSOR_USER_DATA_DIR;
   if (profile) {
     const fs = yield* FileSystem.FileSystem;
@@ -39,12 +41,7 @@ export const prepareCursor = Effect.fn("prepareCursor")(function* ({ executable,
     ...env
   } = process.env;
   return {
-    args: [
-      ...(profile ? ["--user-data-dir", profile] : []),
-      `--test-backend-url=${proxy.baseUrl}`,
-      "--wait",
-      ...args,
-    ],
+    args: [...(profile ? ["--user-data-dir", profile] : []), `--test-backend-url=${proxy.baseUrl}`, "--wait", ...args],
     env,
   };
 }, mapPlatformError("Cannot prepare the Cursor launch"));

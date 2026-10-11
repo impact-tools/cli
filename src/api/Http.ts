@@ -3,10 +3,29 @@ import { FetchHttpClient, HttpClient, HttpClientRequest, HttpClientResponse } fr
 
 import type { Connection } from "../config/Connection.ts";
 
+import { version } from "../../package.json";
 import { CliError } from "../Errors.ts";
 
-/** Impact never redirects API calls; following one could send the key to another host. */
-export const layer = FetchHttpClient.layer.pipe(
+export const CLI_VERSION: string = version;
+/** Every direct call names the CLI release, so Impact can tell which versions are still in use. */
+export const USER_AGENT = `impact-cli/${CLI_VERSION} (${process.platform}; ${process.arch})`;
+/** The proxies keep the coding client's own user-agent and add the CLI release beside it. */
+export const VERSION_HEADER = "x-impact-cli-version";
+
+/**
+ * Impact never redirects API calls; following one could send the key to another host. A request
+ * that names its own user-agent (the npm update check) keeps it.
+ */
+export const layer = Layer.effect(
+  HttpClient.HttpClient,
+  Effect.map(
+    HttpClient.HttpClient,
+    HttpClient.mapRequest((request) =>
+      request.headers["user-agent"] ? request : HttpClientRequest.setHeader(request, "user-agent", USER_AGENT),
+    ),
+  ),
+).pipe(
+  Layer.provide(FetchHttpClient.layer),
   Layer.provide(Layer.succeed(FetchHttpClient.RequestInit)({ redirect: "error" })),
 );
 
