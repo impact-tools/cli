@@ -44,11 +44,14 @@ export type TokenPrices = typeof TokenPrices.Type;
 export const MODEL_PRICE_MULTIPLIER = 0.2;
 
 /**
- * Flat prices of the calls the gateway makes on a model's behalf (the sidecars), charged per
- * call on top of the model's own tokens, whatever upstream answered them. Failed calls are free.
+ * Prices of the calls the gateway makes on a model's behalf (the sidecars), charged per call on
+ * top of the model's own tokens. Failed calls are free.
  */
 export const SIDECAR_PRICES = {
-  /** One new image described for a text-only model; repeats within a turn are free. */
+  /**
+   * The least one new image description for a text-only model costs: a longer one costs its call's
+   * usage at the vision model's tariff. A user's image described within the last day is free.
+   */
   imageDescription: 500,
 } as const satisfies Record<string, UsdMicros>;
 
