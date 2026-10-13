@@ -270,11 +270,16 @@ it("rejects a declared Tab body larger than 4 MiB without contacting the gateway
               },
               (res) => {
                 res.resume();
-                res.once("end", () => resolve(res.statusCode!));
+                res.once("end", () => {
+                  resolve(res.statusCode!);
+                  req.destroy();
+                });
               },
             );
             req.once("error", reject);
-            req.end(Buffer.alloc(4194305));
+            // The proxy refuses on the declared length alone, so no body is sent: writing one into a
+            // connection the refusal closes would fail with EPIPE after the answer arrived.
+            req.flushHeaders();
           });
           expect(status).toBe(413);
           expect(dispatched).toBe(0);

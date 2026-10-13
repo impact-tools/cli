@@ -11,10 +11,10 @@ const Count = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
 // ---------------------------------------------------------------------------------------------
 // GET /v1/usage and /api/codex/usage
 
-export const UsageAccount = Schema.Struct({ id: Schema.String, email: Schema.String });
+const UsageAccount = Schema.Struct({ id: Schema.String, email: Schema.String });
 
 /** Amounts are decimal USD strings. `balance` is what is available now: `total` minus `reserved`. */
-export const UsageCredits = Schema.Struct({
+const UsageCredits = Schema.Struct({
   has_credits: Schema.Boolean,
   unlimited: Schema.Boolean,
   balance: Schema.String,
@@ -23,7 +23,7 @@ export const UsageCredits = Schema.Struct({
 });
 
 /** A key's monthly limit, as Codex reads a usage window. */
-export const UsageWindow = Schema.Struct({
+const UsageWindow = Schema.Struct({
   used_percent: Schema.Finite,
   limit_window_seconds: Count,
   /** Unix seconds. */
@@ -64,7 +64,7 @@ export type UsageWallet = typeof UsageWallet.Type;
 // ---------------------------------------------------------------------------------------------
 // GET /v1/models
 
-export const ModelListPricing = Schema.Struct({
+const ModelListPricing = Schema.Struct({
   input: Schema.Finite,
   output: Schema.Finite,
   cached_input: Schema.Finite,
@@ -74,7 +74,7 @@ export const ModelListPricing = Schema.Struct({
 });
 
 /** A row of the OpenAI-shaped list. `owned_by` is the model's brand. */
-export const OpenAiModel = Schema.Struct({
+const OpenAiModel = Schema.Struct({
   id: Schema.String,
   object: Schema.Literal("model"),
   created: Count,

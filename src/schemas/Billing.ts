@@ -59,7 +59,7 @@ export const keyTools = (stored: Partial<KeyTools>): KeyTools => {
 };
 
 /** How far smart routing may push reasoning: a cap on the effort it picks from a target's ladder. */
-export const ROUTING_CEILINGS = ["low", "medium", "high", "max"] as const;
+const ROUTING_CEILINGS = ["low", "medium", "high", "max"] as const;
 export type RoutingCeiling = (typeof ROUTING_CEILINGS)[number];
 
 /** Smart routing for one key. Saved with the key; the gateway doesn't serve `jev-auto` yet. */
