@@ -4,7 +4,7 @@
   "description": "Launch coding clients through Impact LLM.",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/impact-relay/cli.git"
+    "url": "git+https://github.com/impact-tools/cli.git"
   },
   "bin": {
     "impact": "./dist/impact.js"

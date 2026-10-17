@@ -2,7 +2,7 @@ import { Effect, Schema } from "effect";
 
 import { CliError } from "../Errors.ts";
 
-export const DEFAULT_BASE_URL = "https://api.impactllm.com";
+export const DEFAULT_BASE_URL = "https://api.impact-relay.com";
 
 const ApiKey = Schema.RedactedFromValue(Schema.String.check(Schema.isPattern(/^sk-imp-[0-9A-Za-z]{43}$/)));
 export const Connection = Schema.Struct({

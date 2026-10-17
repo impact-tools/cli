@@ -3,7 +3,7 @@
 Launch installed Claude Code, Codex, Cursor Desktop, Kilo Code and OpenCode clients through Impact from your current directory.
 
 ```sh
-impact login --base-url https://api.impactllm.com
+impact login --base-url https://api.impact-relay.com
 impact claude
 impact codex
 impact kilo
@@ -127,7 +127,7 @@ Native `StreamCpp` requests go to Impact with Impact authorization. The gateway 
 
 For a separately launched Desktop, keep `impact proxy` open and pass its **Cursor backend** URL through `--test-backend-url=<URL>` and `--wait`. Add `--user-data-dir` only when an isolated Cursor profile is desired. Closing the waited-for files/window or stopping Impact ends the managed proxy; keep it running for ongoing suggestions.
 
-Tests exercise the real CLI launcher, native config replies, opaque Connect streaming over HTTP/1.1 and HTTP/2, credential substitution, cancellation and cleanup. A live Desktop suggestion has not been verified in this environment. Other Cursor versions may change these internal flags or descriptors. The native gateway route remains `https://api.impactllm.com/aiserver.v1.AiService/StreamCpp`; the OpenAI base-URL setting configures chat and agent separately, and the launcher does not replace the Desktop model picker.
+Tests exercise the real CLI launcher, native config replies, opaque Connect streaming over HTTP/1.1 and HTTP/2, credential substitution, cancellation and cleanup. A live Desktop suggestion has not been verified in this environment. Other Cursor versions may change these internal flags or descriptors. The native gateway route remains `https://api.impact-relay.com/aiserver.v1.AiService/StreamCpp`; the OpenAI base-URL setting configures chat and agent separately, and the launcher does not replace the Desktop model picker.
 
 ## Source layout
 

@@ -70,7 +70,7 @@ describe("credentials", () => {
     Effect.gen(function* () {
       const saved = { baseUrl: "https://saved.test", apiKey: Redacted.make(key) };
       assert.strictEqual(yield* resolveEndpoint(saved), "https://saved.test");
-      assert.strictEqual(yield* resolveEndpoint(undefined), "https://api.impactllm.com");
+      assert.strictEqual(yield* resolveEndpoint(undefined), "https://api.impact-relay.com");
       process.env.IMPACT_BASE_URL = "https://env.test";
       assert.strictEqual(yield* resolveEndpoint(saved), "https://env.test");
       assert.strictEqual(yield* resolveEndpoint(saved, "https://flag.test/v1"), "https://flag.test");
