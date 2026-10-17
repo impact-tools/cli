@@ -16,10 +16,7 @@ import { welcome } from "./ui/Welcome.ts";
 
 if (process.env.IMPACT_LAUNCH_CWD) process.chdir(process.env.IMPACT_LAUNCH_CWD);
 
-/**
- * Closing the terminal or IDE sends SIGHUP, which the runtime leaves alone; stopping as on Ctrl+C
- * lets the launch remove its temporary Codex home and status files.
- */
+/** Stop cleanly when an IDE closes the terminal so scoped launch files are removed. */
 const interruptOnHangup = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
   Effect.withFiber<A, E, R>((fiber) => {
     const hangup = () => fiber.interruptUnsafe(fiber.id);

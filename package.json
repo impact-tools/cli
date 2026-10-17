@@ -1,6 +1,6 @@
 {
   "name": "@impact-relay/cli",
-  "version": "0.1.1",
+  "version": "0.2.1",
   "description": "Launch coding clients through Impact LLM.",
   "repository": {
     "type": "git",
@@ -24,19 +24,23 @@
     "build:bin": "bun --no-env-file build.ts --compile",
     "prepack": "bun run build",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run --no-file-parallelism",
+    "test:coverage": "vitest run --no-file-parallelism --coverage"
   },
   "devDependencies": {
+    "@bufbuild/protobuf": "1.10.1",
     "@effect/platform-node": "4.0.2",
     "@effect/vitest": "4.0.2",
     "@types/bun": "1.4.2",
     "@types/http-proxy": "1.17.17",
     "@types/which": "3.0.4",
+    "@vitest/coverage-v8": "5.0.2",
     "better-auth": "1.7.6",
     "effect": "4.0.2",
     "env-paths": "4.0.0",
     "es-toolkit": "1.52.0",
     "http-proxy": "1.18.1",
+    "jsonc-parser": "3.3.1",
     "open": "11.0.4",
     "selfsigned": "5.5.0",
     "smol-toml": "1.4.2",
@@ -46,7 +50,7 @@
     "which": "6.0.1"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=22.13"
   },
   "packageManager": "bun@1.4.2",
   "patchedDependencies": {

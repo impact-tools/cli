@@ -51,7 +51,7 @@ export function modelWindows(models: readonly Model[], settings: Record<string, 
       if (model.id.startsWith("claude-") || !model.max_input_tokens || model.max_input_tokens < 100_000) return [];
       const maximum = Math.min(model.max_input_tokens, 1_000_000);
       const selected = saved.modelSettings?.[model.id]?.autoCompactWindow ?? saved.autoCompactWindow;
-      if (typeof selected === "number" && selected <= maximum) return [];
+      if (selected === "auto" || typeof selected === "number" && selected <= maximum) return [];
       return [[model.id, { autoCompactWindow: maximum }]];
     }),
   );

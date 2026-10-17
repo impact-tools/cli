@@ -1,19 +1,18 @@
 import { Effect, FileSystem } from "effect";
-import { toMerged } from "es-toolkit";
+import { flattenObject, toMerged } from "es-toolkit";
 import { randomUUID } from "node:crypto";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { parse, stringify } from "smol-toml";
 
 import { CliError, mapPlatformError } from "../../Errors.ts";
+import { restoreCodexSessionAliases } from "./Sessions.ts";
 
 export const codexHome = () => resolve(process.env.CODEX_HOME ?? join(homedir(), ".codex"));
 
 /**
- * Writes the user's `config.toml` with Impact's settings on top: by default as a temporary profile
- * that `--profile <name>` selects. `home` instead replaces `config.toml` itself, for the launch's own
- * Codex home and commands without `--profile` (`app-server`): the proxy URL carries its secret, so
- * it stays in files only the user can read, never in the process arguments.
+ * Writes a temporary profile: the user's `config.toml` with Impact's settings on top.
+ * `overrides` carries the same settings as `-c` flags for commands without `--profile`.
  */
 export const configureCodex = Effect.fn("configureCodex")(function* (
   model: string,
@@ -31,6 +30,10 @@ export const configureCodex = Effect.fn("configureCodex")(function* (
     try: () => parse(original),
     catch: () => new CliError({ message: "Your Codex config is invalid TOML. Fix it before running impact codex." }),
   });
+  const sqliteHome = existing.sqlite_home ?? process.env.CODEX_SQLITE_HOME ?? codexHome();
+  if (typeof sqliteHome === "string") yield* restoreCodexSessionAliases(codexHome(), resolve(sqliteHome)).pipe(
+    Effect.catch((error) => Effect.logWarning(`Skipping legacy Codex session repair: ${error.message}`)),
+  );
   const catalogPath = yield* fs.makeTempFileScoped({ directory, prefix: ".impact-models-", suffix: ".json" });
   yield* fs.writeFileString(catalogPath, JSON.stringify(catalog));
   const impact = {
@@ -49,23 +52,27 @@ export const configureCodex = Effect.fn("configureCodex")(function* (
     },
     chatgpt_base_url: proxyUrl,
     cli_auth_credentials_store: "file",
-    sqlite_home: existing.sqlite_home ?? process.env.CODEX_SQLITE_HOME ?? codexHome(),
+    sqlite_home: sqliteHome,
     features: { fast_mode: true, apps: false },
   };
-  const merged = stringify(toMerged(existing, impact));
   const name = `impact-${randomUUID()}`;
+  const merged = stringify(toMerged(existing, impact));
   if (target === "home") {
     if (resolve(directory) === codexHome())
       return yield* new CliError({ message: "Impact never rewrites your own Codex config." });
-    // The rename replaces the link to the user's config.toml, never the file it points at.
+    // Replace only the launch home's link; the user's source config remains untouched.
     const temporary = yield* fs.makeTempFileScoped({ directory, prefix: ".impact-config-", suffix: ".toml" });
     yield* fs.chmod(temporary, 0o600);
     yield* fs.writeFileString(temporary, merged);
     yield* fs.rename(temporary, join(directory, "config.toml"));
-    return { name };
+    return { name, overrides: [] as string[] };
   }
   const profilePath = join(directory, `${name}.config.toml`);
   yield* Effect.addFinalizer(() => fs.remove(profilePath, { force: true }).pipe(Effect.ignore));
   yield* fs.writeFileString(profilePath, merged, { mode: 0o600 });
-  return { name };
+  const overrides = Object.entries(flattenObject(impact)).flatMap(([key, value]) => [
+    "-c",
+    `${key}=${JSON.stringify(value)}`,
+  ]);
+  return { name, overrides };
 }, mapPlatformError("Cannot write the Codex profile"));

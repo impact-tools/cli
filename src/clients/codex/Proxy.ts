@@ -1,4 +1,4 @@
-import type { ClientRequest, Server, ServerResponse } from "node:http";
+import type { ClientRequest, IncomingMessage, Server, ServerResponse } from "node:http";
 import type { Socket } from "node:net";
 
 import { Effect, Redacted } from "effect";
@@ -11,8 +11,11 @@ import type { Connection } from "../../config/Connection.ts";
 
 import { CLI_VERSION, VERSION_HEADER } from "../../api/Http.ts";
 import { CliError } from "../../Errors.ts";
-import { isCodexRoute, pathname } from "./Routes.ts";
+import { isCodexRoute } from "./Routes.ts";
 import { createProxyCertificate } from "./Tls.ts";
+
+const FORWARDED =
+  /^\/(?:v1\/(?:models|responses(?:\/compact)?)|backend-api\/codex\/(?:models|responses(?:\/compact)?)|api\/codex\/usage)(?:\?|$)/;
 
 export type Route = { readonly reply: unknown } | { readonly forward: string } | undefined;
 
@@ -21,7 +24,7 @@ export function route(url: string, prefix: string, replies: Readonly<Record<stri
   if (!url.startsWith(`${prefix}/`)) return undefined;
   const path = url.slice(prefix.length);
   if (Object.hasOwn(replies, path)) return { reply: replies[path] };
-  return isCodexRoute(path) ? { forward: path } : undefined;
+  return (FORWARDED.test(path) || isCodexRoute(path)) ? { forward: path } : undefined;
 }
 
 /** ChatGPT account endpoints Codex polls; Impact answers them with the key owner's identity. */
@@ -43,49 +46,96 @@ const accountReplies = (accountId: string, origin: string) => ({
 });
 
 const sendJson = (response: ServerResponse, status: number, body: unknown) => {
-  if (!response.headersSent) response.writeHead(status, { "content-type": "application/json" });
+  if (!response.headersSent)
+    response.writeHead(status, { "content-type": "application/json", "cache-control": "no-store" });
   response.end(JSON.stringify(body));
 };
 
 const failed = () => new CliError({ message: "Cannot start the local Codex proxy." });
 
-const listen = (server: Server) =>
+const listen = (server: Server, port: number) =>
   Effect.callback<number, CliError>((resume) => {
     server.once("error", () => resume(Effect.fail(failed())));
-    server.listen(0, "127.0.0.1", () => {
+    server.listen(port, "127.0.0.1", () => {
       const address = server.address();
       resume(address && typeof address !== "string" ? Effect.succeed(address.port) : Effect.fail(failed()));
     });
   });
 
-/** A loopback boundary keeps native OpenAI credentials away from Impact. */
-export const codexProxy = Effect.fn("codexProxy")(function* (connection: Connection, accountId: string) {
-  const { key, cert, certificateFile } = yield* createProxyCertificate();
-  const prefix = `/${randomUUID()}`;
-  const target = new URL(connection.baseUrl);
-  const upstream = httpProxy.createProxyServer({
-    target: { ...urlToHttpOptions(target), host: target.host, port: target.port },
+export interface CodexUpstream {
+  readonly connection: Connection;
+  readonly accountId: string;
+}
+
+/** Why a request cannot reach Impact, with the HTTP status Codex receives. */
+export class UpstreamError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
+export interface CodexProxyOptions {
+  /** The loopback server certificate; Codex trusts its CA through `CODEX_CA_CERTIFICATE`. */
+  readonly tls: { readonly key: string; readonly cert: string };
+  readonly port?: number;
+  /** The secret path every route lives under; random by default. */
+  readonly prefix?: string;
+  /** Other clients may share this authenticated loopback TLS listener. */
+  readonly fallback?: { handle(request: IncomingMessage, response: ServerResponse): void; upgrade(request: IncomingMessage, socket: Socket, head: Buffer): void };
+}
+
+const failure = (error: unknown) =>
+  error instanceof UpstreamError ? error : new UpstreamError(502, "Cannot reach Impact.");
+
+/**
+ * A loopback boundary keeps native OpenAI credentials away from Impact. `upstream` is resolved for every
+ * request, so the proxy follows the current Impact login.
+ */
+const makeCodexProxy = Effect.fn("codexProxy")(function* (
+  upstream: () => Promise<CodexUpstream>,
+  options: CodexProxyOptions,
+) {
+  const prefix = options.prefix ?? `/${randomUUID()}`;
+  const credentials = new WeakMap<object, Connection>();
+  const proxy = httpProxy.createProxyServer({
     // The route allowlist supplies origin-relative paths; avoid the legacy URL parser.
     toProxy: true,
     changeOrigin: true,
     ws: true,
     proxyTimeout: 10 * 60_000,
   });
-  const withImpactCredentials = (request: ClientRequest) => {
-    request.setHeader("authorization", `Bearer ${Redacted.value(connection.apiKey)}`);
+  const target = (connection: Connection) => {
+    const url = new URL(connection.baseUrl);
+    return { ...urlToHttpOptions(url), host: url.host, port: url.port };
+  };
+  const withImpactCredentials = (request: ClientRequest, incoming: object) => {
+    const connection = credentials.get(incoming);
+    if (connection) request.setHeader("authorization", `Bearer ${Redacted.value(connection.apiKey)}`);
+    else request.removeHeader("authorization");
     request.setHeader(VERSION_HEADER, CLI_VERSION);
-    for (const header of ["cookie", "chatgpt-account-id", "openai-organization", "x-api-key"])
+    for (const header of ["cookie", "chatgpt-account-id", "openai-organization", "x-api-key", "proxy-authorization"])
       request.removeHeader(header);
   };
-  upstream.on("proxyReq", withImpactCredentials);
-  upstream.on("proxyReqWs", withImpactCredentials);
-  upstream.on("error", (_error, _request, response) => {
+  const prepareForward = (request: IncomingMessage, connection: Connection) => {
+    for (const header of ["cookie", "chatgpt-account-id", "openai-organization", "x-api-key", "proxy-authorization"])
+      delete request.headers[header];
+    request.headers.authorization = `Bearer ${Redacted.value(connection.apiKey)}`;
+    request.headers[VERSION_HEADER] = CLI_VERSION;
+    // http-proxy skips proxyReq when Expect is present; credentials must already be safe.
+    delete request.headers.expect;
+  };
+  proxy.on("proxyReq", (request, incoming) => withImpactCredentials(request, incoming));
+  proxy.on("proxyReqWs", (request, incoming) => withImpactCredentials(request, incoming));
+  proxy.on("error", (_error, _request, response) => {
     if ("writeHead" in response)
       sendJson(response as ServerResponse, 502, { error: { message: "Cannot reach Impact.", type: "upstream_error" } });
     else response.destroy();
   });
 
-  const server = createServer({ key, cert });
+  const server = createServer({ key: options.tls.key, cert: options.tls.cert });
   const sockets = new Set<Socket>();
   server.on("connection", (socket) => {
     sockets.add(socket);
@@ -95,26 +145,71 @@ export const codexProxy = Effect.fn("codexProxy")(function* (connection: Connect
     Effect.sync(() => {
       for (const socket of sockets) socket.destroy();
       server.close();
-      upstream.close();
+      proxy.close();
     }),
   );
-  const baseUrl = `https://127.0.0.1:${yield* listen(server)}${prefix}`;
+  const origin = `https://127.0.0.1:${yield* listen(server, options.port ?? 0)}`;
 
-  const replies = accountReplies(accountId, new URL(baseUrl).origin);
   server.on("request", (request, response) => {
-    const target = route(request.url ?? "", prefix, replies);
-    if (target === undefined) response.writeHead(404).end();
-    else if ("reply" in target) sendJson(response, 200, target.reply);
-    else {
-      request.url = target.forward;
-      upstream.web(request, response);
+    const url = request.url ?? "";
+    // Unknown paths are refused before any login is read.
+    if (route(url, prefix, accountReplies("", origin)) === undefined) {
+      if (options.fallback && !url.startsWith(prefix + "/")) return options.fallback.handle(request, response);
+      return response.writeHead(404).end();
     }
+    request.pause();
+    upstream().then(
+      (session) => {
+        const resolved = route(url, prefix, accountReplies(session.accountId, origin))!;
+        if ("reply" in resolved) return sendJson(response, 200, resolved.reply);
+        request.url = resolved.forward;
+        prepareForward(request, session.connection);
+        credentials.set(request, session.connection);
+        proxy.web(request, response, { target: target(session.connection) });
+      },
+      (error) => {
+        const { status, message } = failure(error);
+        sendJson(response, status, { error: { message, type: status === 401 ? "authentication_error" : "upstream_error" } });
+        request.resume();
+      },
+    );
   });
   server.on("upgrade", (request, socket, head) => {
-    const target = route(request.url ?? "", prefix);
-    if (!target || !("forward" in target) || !pathname(target.forward).endsWith("/responses")) return socket.destroy();
-    request.url = target.forward;
-    upstream.ws(request, socket, head);
+    if (options.fallback && !(request.url ?? "").startsWith(prefix + "/")) return options.fallback.upgrade(request, socket as Socket, head);
+    const resolved = route(request.url ?? "", prefix);
+    if (!resolved || !("forward" in resolved) || !resolved.forward.split("?")[0]!.endsWith("/responses"))
+      return socket.destroy();
+    upstream().then(
+      (session) => {
+        request.url = resolved.forward;
+        prepareForward(request, session.connection);
+        credentials.set(request, session.connection);
+        proxy.ws(request, socket, head, { target: target(session.connection) });
+      },
+      () => socket.destroy(),
+    );
   });
-  return { baseUrl, certificateFile };
+  return { baseUrl: `${origin}${prefix}` };
 });
+
+/** New shared-daemon API plus the old per-launch form kept for existing CLI integrations. */
+export function codexProxy(
+  connection: Connection,
+  accountId: string,
+): Effect.Effect<{ readonly baseUrl: string; readonly certificateFile: string }, CliError, never>;
+export function codexProxy(
+  upstream: () => Promise<CodexUpstream>,
+  options: CodexProxyOptions,
+): Effect.Effect<{ readonly baseUrl: string }, CliError, never>;
+export function codexProxy(
+  first: Connection | (() => Promise<CodexUpstream>),
+  second: string | CodexProxyOptions,
+) {
+  if (typeof first === "function") return makeCodexProxy(first, second as CodexProxyOptions);
+  return Effect.flatMap(createProxyCertificate(), ({ key, cert, certificateFile }) =>
+    makeCodexProxy(
+      async () => ({ connection: first, accountId: second as string }),
+      { tls: { key, cert } },
+    ).pipe(Effect.map((proxy) => ({ ...proxy, certificateFile }))),
+  );
+}

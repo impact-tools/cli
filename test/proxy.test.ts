@@ -14,7 +14,7 @@ import { promisify } from "node:util";
 import { expect, it, vi } from "vitest";
 
 import { codexProxy } from "../src/clients/codex/Proxy.ts";
-import { createProxyCertificate } from "../src/clients/codex/Tls.ts";
+import { codexCaBundle, loopbackCertificate } from "../src/clients/codex/Tls.ts";
 
 it("forwards through the bundled Codex proxy on Node when deprecated API calls are fatal", async () => {
   const directory = await mkdtemp(join(tmpdir(), "impact-proxy-node-test-"));
@@ -53,16 +53,24 @@ it("trusts a nested launch certificate and substitutes Impact credentials before
   try {
     await Effect.runPromise(
       Effect.gen(function* () {
-        const parent = yield* createProxyCertificate();
-        vi.stubEnv("CODEX_CA_CERTIFICATE", parent.certificateFile);
+        const parent = yield* codexCaBundle((yield* Effect.promise(() => loopbackCertificate(1))).ca);
+        vi.stubEnv("CODEX_CA_CERTIFICATE", parent);
+        const material = yield* Effect.promise(() => loopbackCertificate(1));
+        certificateFile = yield* codexCaBundle(material.ca);
+        let logins = 0;
         const proxy = yield* codexProxy(
-          {
-            baseUrl: `http://127.0.0.1:${(upstream.address() as AddressInfo).port}`,
-            apiKey: Redacted.make("Impact-test-key"),
+          async () => {
+            logins += 1;
+            return {
+              connection: {
+                baseUrl: `http://127.0.0.1:${(upstream.address() as AddressInfo).port}`,
+                apiKey: Redacted.make("Impact-test-key"),
+              },
+              accountId: "native-account",
+            };
           },
-          "native-account",
+          { tls: material },
         );
-        certificateFile = proxy.certificateFile;
         expect(new URL(proxy.baseUrl).protocol).toBe("https:");
         const ca = yield* Effect.promise(() => readFile(certificateFile!));
         const get = (path: string) =>
@@ -96,10 +104,39 @@ it("trusts a nested launch certificate and substitutes Impact credentials before
         expect(seen).toEqual([
           { url: "/v1/models", authorization: "Bearer Impact-test-key", cookie: undefined, account: undefined },
         ]);
+        const expectRequest = Effect.promise(
+          () =>
+            new Promise<{ status: number; body: string }>((resolve, reject) => {
+              const req = request(proxy.baseUrl + "/v1/responses", {
+                method: "POST",
+                ca,
+                headers: {
+                  authorization: "Bearer native-OpenAI-secret",
+                  cookie: "OpenAI-cookie",
+                  "chatgpt-account-id": "OpenAI-account",
+                  "content-length": "2",
+                  expect: "100-continue",
+                },
+              }, (res) => {
+                let body = "";
+                res.on("data", (chunk) => { body += chunk.toString(); });
+                res.on("end", () => resolve({ status: res.statusCode!, body }));
+              });
+              req.once("continue", () => req.end("{}"));
+              req.once("error", reject);
+              req.flushHeaders();
+            }),
+        );
+        expect((yield* expectRequest).status).toBe(200);
+        expect(seen.at(-1)).toEqual({
+          url: "/v1/responses", authorization: "Bearer Impact-test-key", cookie: undefined, account: undefined,
+        });
         const check = JSON.parse((yield* get("/api/codex/accounts/check")).body);
         expect(check.accounts[0].workspace_backend_origin).toBe(new URL(proxy.baseUrl).origin);
         expect((yield* get("/api/mcp")).status).toBe(404);
-        expect(seen).toHaveLength(1);
+        expect(seen).toHaveLength(2);
+        // Each routed request reads the current login; refused paths never do.
+        expect(logins).toBe(3);
       }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
     );
     await expect(stat(certificateFile!)).rejects.toMatchObject({ code: "ENOENT" });

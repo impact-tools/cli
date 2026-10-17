@@ -17,7 +17,7 @@ export const command = Command.make("impact").pipe(
       commands: [
         login.pipe(Command.withShortDescription("Sign in or import a key")),
         status.pipe(Command.withShortDescription("Wallet balance and spend")),
-        logout.pipe(Command.withShortDescription("Sign out")),
+        logout.pipe(Command.withShortDescription("Remove local login")),
       ],
     },
     { group: "Diagnostics", commands: [doctor.pipe(Command.withShortDescription("Connection and installed clients"))] },

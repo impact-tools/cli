@@ -6,7 +6,9 @@ import { join } from "node:path";
 
 import { apiKey, baseUrl } from "../src/config/Connection.ts";
 import {
+  configDirectory,
   currentConnection,
+  daemonConnection,
   readConnection,
   removeConnection,
   resolveEndpoint,
@@ -44,6 +46,11 @@ describe("apiKey", () => {
 });
 
 describe("credentials", () => {
+  it("resolves a relative config directory before any daemon changes its working directory", () => {
+    process.env.IMPACT_CONFIG_DIR = "./relative-impact-config";
+    expect(configDirectory()).toBe(join(process.cwd(), "relative-impact-config"));
+  });
+
   it.effect("stores an endpoint-bound key with private permissions and removes it on logout", () =>
     Effect.gen(function* () {
       const file = join(environment.directory, "credentials.json");
@@ -63,6 +70,20 @@ describe("credentials", () => {
 
       yield* removeConnection;
       assert.isUndefined(yield* readConnection);
+    }).pipe(Effect.provide(NodeServices.layer)),
+  );
+
+  it.effect("daemon credentials move from env bootstrap to saved login and stay signed out after logout", () =>
+    Effect.gen(function* () {
+      process.env.IMPACT_API_KEY = key;
+      process.env.IMPACT_BASE_URL = "https://env.test";
+      const state = { bootstrap: true };
+      assert.strictEqual(Redacted.value((yield* daemonConnection(state)).apiKey), key);
+      yield* saveConnection({ baseUrl: "https://saved.test", apiKey: Redacted.make(key) });
+      assert.strictEqual((yield* daemonConnection(state)).baseUrl, "https://saved.test");
+      assert.isFalse(state.bootstrap);
+      yield* removeConnection;
+      expect((yield* Effect.flip(daemonConnection(state))).message).toContain("Run impact login");
     }).pipe(Effect.provide(NodeServices.layer)),
   );
 

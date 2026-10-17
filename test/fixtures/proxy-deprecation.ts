@@ -6,6 +6,7 @@ import { createServer } from "node:http";
 import { request } from "node:https";
 
 import { codexProxy } from "../../src/clients/codex/Proxy.ts";
+import { codexCaBundle, loopbackCertificate } from "../../src/clients/codex/Tls.ts";
 
 const upstream = createServer((_req, res) => res.end("proxied"));
 upstream.listen(0, "127.0.0.1");
@@ -13,15 +14,20 @@ await once(upstream, "listening");
 try {
   await Effect.runPromise(
     Effect.gen(function* () {
+      const material = yield* Effect.promise(() => loopbackCertificate(1));
+      const certificateFile = yield* codexCaBundle(material.ca);
       const proxy = yield* codexProxy(
-        {
-          baseUrl: `http://127.0.0.1:${(upstream.address() as { port: number }).port}`,
-          apiKey: Redacted.make("test-key"),
-        },
-        "test-account",
+        async () => ({
+          connection: {
+            baseUrl: `http://127.0.0.1:${(upstream.address() as { port: number }).port}`,
+            apiKey: Redacted.make("test-key"),
+          },
+          accountId: "test-account",
+        }),
+        { tls: material },
       );
       yield* Effect.promise(async () => {
-        const ca = await readFile(proxy.certificateFile);
+        const ca = await readFile(certificateFile);
         const result = await new Promise<{ status: number; body: string }>((resolve, reject) => {
           const req = request(proxy.baseUrl + "/v1/models", { ca }, (res) => {
             let body = "";

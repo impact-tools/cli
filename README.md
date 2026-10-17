@@ -1,6 +1,6 @@
 # Impact CLI
 
-Launch installed Claude Code, Codex, Cursor Desktop, Kilo Code and OpenCode clients through Impact from your current directory.
+Launch installed Claude Code, Codex, Cursor Desktop, Antigravity Agents or IDE, Kilo Code and OpenCode clients through Impact from your current directory.
 
 ```sh
 impact login --base-url https://api.impact-relay.com
@@ -9,23 +9,24 @@ impact codex
 impact kilo
 impact opencode
 impact cursor
+impact antigravity
 impact status
 ```
 
-Login uses Better Auth device authorization: approve the terminal's code in your browser. The CLI stores an Impact API key in the OS configuration directory with owner-only permissions. A repeated `impact login` revokes the key the previous login created once the new one is saved, and `impact logout` revokes it before removing the saved login (`--keep-key` keeps it). A key imported with `--api-key` or `--key-stdin` is never revoked by the CLI. Revocation uses the key's own secret (`POST /v1/keys/self/revoke`); when it fails, the CLI warns and links the API keys page instead of failing.
+Login uses Better Auth device authorization: approve the terminal's code in your browser. The CLI stores an Impact API key in the OS configuration directory with owner-only permissions. Browser-created keys are revoked when a later login replaces them or when `impact logout` removes them; imported keys are never revoked by the CLI.
 
 For an existing key, use `impact login --api-key` for a hidden prompt or `impact login --key-stdin`. Native client arguments pass through unchanged, including `impact claude -p "hello"` and `impact codex exec "hello"`.
 
 ## Installation from npm
 
-The public npm package is `@impact-relay/cli`, hosted on npmjs.com. You need Node.js 22 or later. Installation requires no npm account or token.
+The public npm package is `@impact-relay/cli`, hosted on npmjs.com. You need Node.js 22.13 or later for the native SQLite profile API. Installation requires no npm account or token.
 
 ```sh
 npm install --global @impact-relay/cli
 impact --version
 ```
 
-You can also download the `.tgz` artifact from a successful Actions run and install it with `npm install --global ./impact-relay-cli-0.1.0.tgz`. The archive includes the bundled CLI and requires no runtime dependencies or Bun installation.
+You can also download the `.tgz` artifact from a successful Actions run and install it with `npm install --global ./impact-relay-cli-0.2.1.tgz`. The archive includes the bundled CLI and requires no runtime dependencies or Bun installation.
 
 ## Build and release
 
@@ -72,15 +73,17 @@ The status line displays `Impact · account email · $balance USD`. The wallet b
 
 ## Codex configuration
 
-Each launch reads the existing `CODEX_HOME/config.toml` (default `~/.codex/config.toml`), merges Impact settings into a temporary native profile, and runs Codex with `--no-daemon --profile <name>`. The original file is preserved byte for byte. The profile and downloaded model catalog are removed when the process exits. User MCP servers and other settings are retained; the built-in OpenAI apps integration is disabled in the Impact profile because its MCP backend is outside Impact's gateway.
+Run `impact proxy setup` once and `impact proxy start` before launching Codex. Each launch reads the existing `CODEX_HOME/config.toml` (default `~/.codex/config.toml`), merges Impact settings into a temporary native profile, and runs Codex with `--no-daemon --profile <name>`. The original file is preserved byte for byte. The profile and downloaded model catalog are removed when the process exits. User MCP servers and other settings are retained; the built-in OpenAI apps integration is disabled in the Impact profile because its MCP backend is outside Impact's gateway.
 
-Codex loads Impact's native model names and Fast capabilities. Fast pricing is configured per model route by the Impact administrator. Each launch obtains the Impact key owner's identity from `/v1/usage` and creates a temporary, isolated Codex authentication file for the account UI. The original ChatGPT login is preserved. Codex settings, skills, plugins, sessions and history remain available. A loopback proxy supplies the actual Impact key upstream and uses a temporary TLS certificate trusted by the child process, including for HTTP development backends.
+Codex loads Impact's native model names and Fast capabilities. Fast pricing is configured per model route by the Impact administrator. Each launch obtains the Impact key owner's identity from `/v1/usage` and creates a temporary, isolated Codex authentication file for the account UI. The original ChatGPT login is preserved. Codex settings, skills, plugins, sessions and history remain available. After exit, the launch home retains only links to sessions, archived sessions and shell snapshots: Codex's SQLite index stores absolute paths through that home, so these aliases must remain for resume. Authentication, profiles and model catalogs are removed. Codex talks to the background proxy (see [Cursor Desktop](#cursor-desktop) for `impact proxy setup` and `start`): a loopback HTTPS endpoint under a secret path that supplies the actual Impact key upstream, including for HTTP development backends. Its certificate has its own CA, trusted only by the launched Codex through a per-launch `CODEX_CA_CERTIFICATE` bundle that adds it to the usual roots. `impact codex` prints the command to run when the proxy is not set up or not running.
 
 Inside Codex, `/status` identifies the account as `Impact · <email>` and shows available funds in its `Credits` row. Codex 0.160.0 rounds that USD amount to an integer and displays `Unknown` for the plan, because an Impact wallet is not a ChatGPT subscription. `impact status` shows the full wallet balance, including active reservations, with `Held` and `Available` listed separately. It also shows total spending and a per-model breakdown for the dashboard's last-seven-days period. Spending is fetched only for this command; an unavailable breakdown does not hide the balance. An existing ChatGPT login is not required.
 
 The launcher configures a named `impact` Responses provider instead of overriding `openai_base_url`. This avoids Codex's base-URL warning and loads every enabled public model, including Claude, Gemini and GLM. The provider uses HTTP because Codex's WebSocket setting applies to the whole provider and the other families use the HTTP translation routes. GPT HTTP Responses still preserves its native payload and SSE. In Codex 0.160.0, remote compaction is restricted to built-in OpenAI/Azure providers; the custom provider uses local compaction. Account and usage polling remain enabled through the isolated authentication profile. The temporary account has no ChatGPT workspace ID: workspace discovery would otherwise overwrite its email with a plan-only account display.
 
-The `app-server` subcommand lacks the native `--profile` option. Its launch home gets the merged configuration as its own `config.toml` instead of `-c` overrides, so the proxy's secret URL never appears in the process arguments. Interactive launches select embedded mode explicitly and do not produce the shared-server configuration warning.
+Before launching, the launcher restores missing session aliases referenced by Codex's SQLite index, including aliases deleted by older launcher versions. The index and rollout files are preserved.
+
+The `app-server` subcommand lacks the native `--profile` option. Its isolated launch home receives the merged `config.toml`, keeping the proxy's secret path out of process arguments. Interactive launches select embedded mode explicitly and do not produce the shared-server configuration warning.
 
 ## Kilo Code configuration
 
@@ -109,32 +112,58 @@ impact opencode run --model impact/claude-opus-5-5 --variant max "Review this ch
 
 OpenCode adds its own `low`, `medium` and `high` variants to every reasoning model. The launcher disables each effort the gateway does not advertise, so the variant list matches `reasoning_efforts`; for example, a model advertising only `none` and `high` offers exactly those two. Requests carry OpenCode's own `User-Agent`, which Impact identifies as OpenCode. This integration was checked with OpenCode 1.18.31 and 1.18.34.
 
-## Local proxy and Cursor Tab autocomplete
+## Cursor Desktop
 
 ```sh
-# Serve the local API and native Cursor backend until Ctrl+C.
-impact proxy --port 8080
-
-# Start a scoped proxy and open Cursor Desktop from this directory.
+impact proxy setup   # once: certificates, port and proxy login
+impact proxy start   # background proxy; also stop, restart, status
 impact cursor .
 ```
 
-`impact proxy` prints a loopback capability URL and its OpenAI-compatible `/v1` base URL. Use the full printed URL, including its random path. The proxy supplies the saved Impact key for models, usage, Responses, Chat Completions, Messages and image API requests. It accepts HTTP/1.1 and cleartext HTTP/2; the URL expires when the process stops. It is a local backend endpoint, not an HTTP CONNECT proxy. Cursor's cloud-mediated OpenAI override needs the public Impact URL rather than this loopback address.
+Cursor, Codex and Antigravity run through one background proxy. `impact proxy setup` creates its files in `<Impact config directory>/proxy` and prints each path: for Cursor, a CA certificate and a server certificate for Cursor's hosts with its key; for Codex and Antigravity, a CA certificate and a `127.0.0.1` server certificate with its key; and `config.json` with both ports, the proxy login, Codex's secret path and the key that signs local client sessions. Each CA private key is discarded after it signs its server certificate, so nothing else can be issued from it. Secret files are readable only by the owner. Ports are the first free ones in 17420–17439; `--port` selects Cursor's. In a terminal, setup then asks whether to start the proxy (default no). `--force` replaces everything; reopen Impact desktop clients afterwards. Running setup again on a setup from an earlier version adds the Codex endpoint without changing Cursor's certificate.
 
-`impact cursor` starts the loopback proxy first, then supplies Cursor's native `--test-backend-url` and `--wait`. Cursor runs with its normal user-data directory, so settings, extensions, themes, sessions and its existing login remain in place. Set `IMPACT_CURSOR_BIN` for another Desktop executable or `IMPACT_CURSOR_USER_DATA_DIR` when an isolated profile is explicitly needed. Run this on the computer with Desktop installed; the remote SSH/WSL Cursor CLI cannot configure local Tab. If Cursor is already open, close its windows before relaunching so the existing process does not retain an old backend URL.
+`impact proxy start` runs `impact proxy run` in the background and writes its output to `proxy/proxy.log`; `impact proxy` and `impact proxy status` show the process, ports and account. Starting checks nothing beyond the proxy's own files: no login, Impact connection or installed client is required. Every request reads the current Impact login, so `impact login` and `impact logout` apply without a restart. Cursor's protocol descriptors, account and model catalog load on Cursor's first request and again when the login or the installed Cursor changes; run `impact proxy restart` to reload the model catalog. Clients never start the proxy: without a setup or a running proxy, or when the proxy reads a different login than the launching shell, they print the command to run and exit.
 
-Native `StreamCpp` requests go to Impact with Impact authorization. The gateway chooses its Cursor pool account according to the key's enabled funding sources. Other native RPCs use the editor's own Cursor login against Cursor's HTTP/1 backend. The local proxy preserves native Tab configuration while enabling the Impact-backed frontend, requesting full text, and disabling account-bound context chunks and FileSync. This avoids asking a gateway account to resolve files synced under the editor account. Tab config field numbers were checked against Cursor 3.22.12's shipped protobuf descriptors. This setup uses no custom CA or system trust changes.
+`impact cursor` launches the unchanged installed Cursor with a dedicated persistent profile and returns; the editor's output goes to `impact-cursor.log` in that profile. When the Impact instance already runs, the arguments open a new window in it. Your normal Cursor window and login remain available. The managed profile defaults to `<Impact config directory>/cursor/profile`. Cursor allows one running instance per profile directory, and this profile holds the local Impact sign-in and model state, so it stays separate from your normal profile. Each fresh launch copies your Cursor configuration into it: settings, keybindings, user tasks, snippets, named profiles with their folder associations, and disabled extensions. Extensions are shared through Cursor's extension directory, and a named profile's extension list is linked, so neither instance removes extensions only the other knows. Settings you change in the Impact window are kept on later launches; other settings follow your normal Cursor. Your normal profile is only read. Conversations and history stay separate. No Cursor account is required: the proxy reads the Impact identity and enabled model catalog and issues a local session, which stays valid across proxy restarts. The real Impact key stays in the proxy and is substituted only on requests to Impact.
 
-For a separately launched Desktop, keep `impact proxy` open and pass its **Cursor backend** URL through `--test-backend-url=<URL>` and `--wait`. Add `--user-data-dir` only when an isolated Cursor profile is desired. Closing the waited-for files/window or stopping Impact ends the managed proxy; keep it running for ongoing suggestions.
+Node transports receive the proxy CA through `NODE_EXTRA_CA_CERTS`, added to any roots you already set there. Chromium is explicitly routed with `--proxy-server` and receives the server certificate's SPKI through `--ignore-certificate-errors-spki-list`. No system trust or application files are changed. The launcher sets `--disable-http2` and Cursor's native HTTP/1.1 SSE settings because its custom HTTP/2 transport can bypass environment proxies. The local listener also supports HTTP/2. Native requests must supply the local bearer or use the authenticated CONNECT login; an explicitly invalid bearer is always rejected. This also supports Cursor's extension-host SSE transport when origin headers are absent.
 
-Tests exercise the real CLI launcher, native config replies, opaque Connect streaming over HTTP/1.1 and HTTP/2, credential substitution, cancellation and cleanup. A live Desktop suggestion has not been verified in this environment. Other Cursor versions may change these internal flags or descriptors. The native gateway route remains `https://api.impact-relay.com/aiserver.v1.AiService/StreamCpp`; the OpenAI base-URL setting configures chat and agent separately, and the launcher does not replace the Desktop model picker.
+The adapter reads protobuf descriptors from the installed editor without executing its bundle. Native model and account RPCs are answered locally. Chat and agent requests use Impact Chat Completions; native read, write, edit, shell, directory, grep and MCP execution requests are sent back to Cursor, which retains its approval UI. Conversation checkpoints are stored through Cursor's native KV protocol. Cursor's server-side agent prompt is replaced with Impact's own prompt. Always-applied rules, user rules, hook context and MCP instructions are sent in full. Agent-requested rules, file-pattern rules and skills are listed once with their descriptions and paths; the model reads a file when it needs it. Rules, skills and commands the user attaches to a message are sent in full. Tab's `StreamCpp` bytes go to Impact's existing native endpoint; full-text context is enabled and account-bound FileSync and indexing are disabled.
+
+Normal Agent and Ask turns, read-only planning discussions and cancellation are supported. Dedicated plan execution, resume, summarization, cloud/background agents, server-side indexing and native web/search/subagent tools are not implemented. Unsupported actions return explicit errors. This integration was verified with Cursor 3.16.17; other releases can change internal protocols.
+
+Protocol tests cover text generation, history, native tools, HTTP/1.1 SSE/poll fallback, cancellation, credentials and cleanup. Live Desktop checks against a mock Impact backend verified account/model display, an agent response, native file reads and writes with review controls, shell execution and Tab suggestion display and acceptance. Tab relays the native protocol and requires an enabled Cursor funding source in the real Impact backend; these checks do not establish the availability of that funding source.
+
+Run the commands on the computer with Cursor Desktop installed. `IMPACT_CURSOR_BIN` selects another executable and `IMPACT_CURSOR_APP_DIR` its descriptor directory; set them for `impact proxy start` too, since the proxy reads the editor's protocol descriptors. `IMPACT_CURSOR_USER_DATA_DIR` selects another managed profile. Stopping the proxy leaves open Impact windows and Codex sessions without AI until it starts again.
+
+## Antigravity Agents and IDE
+
+```sh
+impact proxy setup       # once; prints certificate paths and offers to start
+impact proxy start       # or restart after updating the CLI
+impact antigravity
+```
+
+The launcher detects the installed Antigravity IDE first (`Antigravity IDE.app`, verified with IDE 2.5.5) and falls back to the Antigravity Agents hub (verified with Desktop 2.21.1). `IMPACT_ANTIGRAVITY_BIN` selects another executable. Agents must retain `resources/app.asar` and `resources/bin/language_server`; IDE must retain its `app/product.json` and `app/extensions/antigravity` files. Linux and Windows paths are supported but have not been verified with their native applications.
+
+The launcher uses the installed application unchanged and keeps its normal profile, projects, settings and conversation storage. Quit an already running Antigravity before the first Impact launch so Electron receives the launch environment. No Google login is needed: the stock language server runs in enterprise gateway mode and Impact authenticates generation requests. Account balance remains available through `impact status`.
+
+For Agents, the proxy serves the application's own interface, adapts its gRPC-Web model selection, and translates the native Gemini streaming protocol into Impact Chat Completions. For IDE, the same daemon terminates only the enumerated Google Cloud Code hosts and translates `/v1internal:streamGenerateContent` into Impact Chat Completions. Both model pickers use Impact display names; `IMPACT_MODEL` selects the initial model. Text and reasoning stream as they arrive; tool arguments are assembled before delivery. Native IDE and Agents tools continue using their normal local execution and permission controls. System instructions are passed once, and opaque thought signatures are excluded from replay. Image attachments depend on the selected model's advertised vision capability.
+
+Agents shares Codex's loopback HTTPS listener and certificate. IDE uses the shared Cursor HTTP CONNECT proxy with a dedicated Antigravity CA; the launcher supplies `HTTP_PROXY`, `HTTPS_PROXY`, `NODE_EXTRA_CA_CERTS`, the SPKI pin and a local refresh token. The actual Impact key stays in the daemon. The stock IDE profile, settings, extensions and conversation storage are used unchanged. `proxy/antigravity-session.json` stores the Agents registration; `proxy/antigravity-ide-session.json` stores only the selected IDE model and login hash. The daemon does not restart the remote gateway. Interrupted generations may need to be retried.
+
+Logs are in `proxy/antigravity.log` (language server) and `proxy/antigravity-desktop.log` (Electron). Native logs can include conversation context. After `impact login` switches accounts, quit and relaunch Antigravity to obtain a new local session. After `proxy setup --force`, relaunch desktop clients to load the new certificate.
+
+Supported flows include single-model conversations, model switching, streaming responses and native tool calls with results in Agents and IDE. IDE's Tab/Supercomplete requests use the same Cloud Code stream adapter when the installed language server requests them. Model comparison (Battle Mode), Google-hosted tools and file IDs, image generation, and Google account or marketplace services are not implemented by this adapter. Their availability must not be inferred from the stock interface. The linked [regional bypass project](https://github.com/vezlin1/antigravity-bypass-russia) modifies application files to route Google's service traffic; this integration connects generation to Impact through the CLI proxy.
 
 ## Source layout
 
 - `clients/Launch.ts` lists the clients and runs the chosen one; `clients/Client.ts` holds what they share.
 - `clients/claude/` owns Claude settings, the model picker and the status line.
-- `clients/cursor/` owns the native Desktop backend and Tab configuration.
-- `clients/codex/` owns Codex authentication, profiles, model catalog, loopback proxy, and TLS certificates.
+- `clients/cursor/` owns the native Desktop backend, HTTPS interception and dedicated launch profile.
+- `proxy/` owns the background proxy for Cursor, Codex and Antigravity: its persistent files, the process and its control requests.
+- `clients/antigravity/` owns the stock Agents and IDE launch, Cloud Code interception, model selection and Gemini streaming translation.
+- `clients/codex/` owns Codex authentication, profiles, model catalog, the loopback endpoint and its certificates.
 - `clients/opencode/` owns the launch overlay and model definitions, prices and reasoning variants shared by OpenCode and Kilo.
 - `commands/` defines the CLI commands; `Command.ts` assembles them. `impact helper token` and `impact helper status-line` are unlisted commands that clients call during a launch.
 - `auth/` handles Impact device authorization and API key input.
@@ -153,8 +182,10 @@ Expected failures are `CliError`s with a one-line message; `main.ts` prints it a
 | `IMPACT_API_KEY`                                                                                       | Key for this invocation; no need to save it                |
 | `IMPACT_MODEL`                                                                                         | Initial model from the enabled catalog                     |
 | `IMPACT_CONFIG_DIR`                                                                                    | CLI credential directory                                   |
-| `IMPACT_CLAUDE_BIN`, `IMPACT_CODEX_BIN`, `IMPACT_CURSOR_BIN`, `IMPACT_KILO_BIN`, `IMPACT_OPENCODE_BIN` | Native client executable                                   |
-| `IMPACT_CURSOR_USER_DATA_DIR`                                                                          | Optional Cursor profile override; the default is Cursor's normal profile |
+| `IMPACT_CLAUDE_BIN`, `IMPACT_CODEX_BIN`, `IMPACT_CURSOR_BIN`, `IMPACT_ANTIGRAVITY_BIN`, `IMPACT_KILO_BIN`, `IMPACT_OPENCODE_BIN` | Native client executable                                   |
+| `IMPACT_CURSOR_USER_DATA_DIR`                                                                          | Persistent Cursor profile used by the launcher             |
+| `IMPACT_CURSOR_APP_DIR`                                                                                | Installed Cursor application or resources directory for descriptors |
+| `IMPACT_CURSOR_DEBUG`                                                                                  | Set to `1` for local route and transport diagnostics        |
 | `IMPACT_DISABLE_UPDATE_CHECK`                                                                          | Disable the interactive npm version check                  |
 | `CODEX_HOME`                                                                                           | Existing Codex configuration and authentication directory  |
 

@@ -1,13 +1,13 @@
 import { Effect, FileSystem, Schema } from "effect";
 import envPaths from "env-paths";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 import { CliError, mapPlatformError } from "../Errors.ts";
 import { apiKey, baseUrl, Connection, DEFAULT_BASE_URL } from "./Connection.ts";
 
 const ConnectionJson = Schema.fromJsonString(Connection);
-const configDirectory = () => process.env.IMPACT_CONFIG_DIR ?? envPaths("impact", { suffix: "" }).config;
-const configFile = () => join(configDirectory(), "credentials.json");
+export const configDirectory = () => resolve(process.env.IMPACT_CONFIG_DIR ?? envPaths("impact", { suffix: "" }).config);
+export const configFile = () => join(configDirectory(), "credentials.json");
 
 export const readConnection = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
@@ -35,6 +35,20 @@ export const currentConnection = Effect.gen(function* () {
       message: "The saved key belongs to a different Impact endpoint. Run impact login --base-url <url>.",
     });
   return saved;
+});
+
+/**
+ * Daemons may bootstrap once from invocation credentials, but must switch to the saved login as soon as it
+ * appears and must not resurrect those stale credentials after logout.
+ */
+export const daemonConnection = (state: { bootstrap: boolean }) => Effect.gen(function* () {
+  const saved = yield* readConnection;
+  if (saved) {
+    state.bootstrap = false;
+    return saved;
+  }
+  if (!state.bootstrap) return yield* new CliError({ message: "Run impact login, or set IMPACT_API_KEY." });
+  return yield* currentConnection;
 });
 
 export const saveConnection = Effect.fn("saveConnection")(

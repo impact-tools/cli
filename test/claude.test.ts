@@ -50,6 +50,11 @@ describe("modelWindows", () => {
     assert.deepStrictEqual(modelWindows(catalog.data, { autoCompactWindow: 500_000 }), {
       "gpt-6.1-sol": { autoCompactWindow: 272_000 },
     });
+    assert.deepStrictEqual(modelWindows(catalog.data, { autoCompactWindow: "auto" }), {});
+    assert.deepStrictEqual(
+      modelWindows(catalog.data, { modelSettings: { "gpt-6.1-sol": { autoCompactWindow: "auto" } } }),
+      {},
+    );
   });
 });
 

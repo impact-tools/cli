@@ -8,10 +8,7 @@ const ApiKey = Schema.RedactedFromValue(Schema.String.check(Schema.isPattern(/^s
 export const Connection = Schema.Struct({
   baseUrl: Schema.String,
   apiKey: ApiKey,
-  /**
-   * Set when `impact login` created the key through the browser: the CLI revokes that key when a new
-   * login replaces it or on `impact logout`. A pasted key has none and is never revoked.
-   */
+  /** Browser-created keys are revoked when a login replaces or removes them. */
   createdKey: Schema.optional(Schema.Struct({ id: Schema.String })),
 });
 export type Connection = typeof Connection.Type;

@@ -13,8 +13,12 @@ export interface LaunchOptions {
 export const executableVariable = (name: string) => `IMPACT_${name.toUpperCase()}_BIN`;
 
 export const findExecutable = (name: string): string | null => {
-  const desktop = "/Applications/Cursor.app/Contents/MacOS/Cursor";
-  const fallback = name === "cursor" && process.platform === "darwin" && existsSync(desktop) ? desktop : name;
+  const desktop = name === "cursor"
+    ? "/Applications/Cursor.app/Contents/MacOS/Cursor"
+    : name === "antigravity"
+      ? ["/Applications/Antigravity IDE.app/Contents/MacOS/Electron", "/Applications/Antigravity.app/Contents/MacOS/Antigravity"].find(path => existsSync(path))
+      : undefined;
+  const fallback = desktop && process.platform === "darwin" && existsSync(desktop) ? desktop : name;
   return which.sync(process.env[executableVariable(name)] ?? fallback, { nothrow: true });
 };
 

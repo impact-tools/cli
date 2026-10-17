@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/impact-tools/cli/compare/v0.1.1...v0.2.1) (2026-10-17)
+
+
+### Features
+
+* **cli:** add shared Cursor, Codex and Antigravity proxy integrations ([97c8b55](https://github.com/impact-tools/cli/commit/97c8b55))
+
 ## [0.1.1](https://github.com/impact-tools/cli/compare/v0.2.0...v0.1.1) (2026-10-17)
 
 
