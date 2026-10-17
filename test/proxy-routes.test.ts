@@ -20,6 +20,7 @@ import { cursorProxy, isApiPath } from "../src/clients/cursor/Proxy.ts";
 
 const server = join(import.meta.dirname, "../../packages/server/src/v1");
 const gateway = join(import.meta.dirname, "../../packages/gateway/src/providers/chatgpt/Native.ts");
+const hasServerSources = existsSync(server) && existsSync(gateway);
 const ROUTE_FILES = ["Routes.ts", "ReadRoutes.ts", "NativeRoutes.ts"];
 /** The namespaces Impact's API and Codex's native protocols live under. */
 const API_PATH = /^\/(?:v1|backend-api\/codex|api\/codex)\//;
@@ -71,8 +72,10 @@ const CLOSED_API_ROUTES: Readonly<Record<string, string>> = {
   "/v1/alpha/*": "server-side context management is off on Impact",
 };
 
-describe.skipIf(!existsSync(server))("proxy routes against the server", () => {
-  const routes = serverRoutes();
+describe.skipIf(!hasServerSources)("proxy routes against the server", () => {
+  // The standalone CLI repository has no sibling server or gateway sources. Vitest still evaluates
+  // the suite body while registering skipped tests, so avoid reading those optional files here.
+  const routes = hasServerSources ? serverRoutes() : [];
 
   it("reads the server's routes", () => {
     for (const path of ["/v1/responses", "/v1/images/edits", "/backend-api/codex/images/generations"])
