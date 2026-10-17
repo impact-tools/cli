@@ -53,6 +53,9 @@
     "node": ">=22.13"
   },
   "packageManager": "bun@1.4.2",
+  "overrides": {
+    "@effect/platform-node-shared": "4.0.2"
+  },
   "patchedDependencies": {
     "http-proxy@1.18.1": "patches/http-proxy@1.18.1.patch"
   }
