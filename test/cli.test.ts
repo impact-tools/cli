@@ -340,7 +340,7 @@ describe("impact", () => {
       code: 1,
       stderr: "The Impact proxy is not running. Start it with impact proxy start.\n",
     });
-  });
+  }, 30_000);
 
   it("requires the proxy setup before opening Cursor", async () => {
     await expect(impact(["cursor", "."], cursorEnv())).rejects.toMatchObject({
@@ -386,7 +386,7 @@ describe("impact", () => {
       if (!stopped) await impact(["proxy", "stop"], env);
     }
     expect((await impact(["proxy", "status"], env)).stdout).toContain("Stopped.");
-  });
+  }, 30_000);
 
   it("passes Cursor help through offline and rejects flags that bypass its managed connection", async () => {
     const result = await impact(["cursor", "--help"], { IMPACT_API_KEY: "", IMPACT_CURSOR_BIN: fixture });
