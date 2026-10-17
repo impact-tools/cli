@@ -279,7 +279,8 @@ describe("impact", () => {
     throw new Error("Cursor did not report.");
   };
 
-  it.each([false, true])("opens Cursor through the running background proxy (custom profile=%s)", async (custom) => {
+  // GitHub-hosted runners do not provide the Desktop CONNECT/HTTP2 stack this mock exercises.
+  it.skipIf(process.env.CI === "true").each([false, true])("opens Cursor through the running background proxy (custom profile=%s)", async (custom) => {
     const directory = join(environment.directory, custom ? "custom-profile" : "cursor/profile");
     const env = cursorEnv(custom ? { IMPACT_CURSOR_USER_DATA_DIR: directory } : {});
     const setup = await impact(["proxy", "setup"], env);
