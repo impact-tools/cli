@@ -5,6 +5,11 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+    inputs:
+      release_as:
+        description: "Release version to use for a one-off recovery release (for example, 0.2.1)"
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -62,6 +67,8 @@ jobs:
     steps:
       - id: release
         uses: googleapis/release-please-action@v5.0.0
+        with:
+          release-as: ${{ inputs.release_as || '' }}
 
   # npm trusted publishing: npm exchanges this workflow's OIDC token for a publish token, so there is
   # no npm secret. It needs npm 11.5.1 or newer, hence Node 24.
