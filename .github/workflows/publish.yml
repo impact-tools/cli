@@ -10,6 +10,11 @@ on:
         description: "Release version to use for a one-off recovery release (for example, 0.2.1)"
         required: false
         type: string
+      publish_npm:
+        description: "Publish the package to npm after creating the GitHub release"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -73,7 +78,7 @@ jobs:
   # npm trusted publishing: npm exchanges this workflow's OIDC token for a publish token, so there is
   # no npm secret. It needs npm 11.5.1 or newer, hence Node 24.
   publish:
-    if: needs.release-please.outputs.release_created == 'true'
+    if: needs.release-please.outputs.release_created == 'true' && inputs.publish_npm == true
     needs: release-please
     runs-on: ubuntu-latest
     timeout-minutes: 5
