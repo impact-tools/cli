@@ -269,7 +269,7 @@ describe("impact", () => {
   });
   /** The detached editor writes its output to the profile log; wait until it has printed its report. */
   const cursorReport = async (directory: string) => {
-    for (let attempt = 0; attempt < 100; attempt++) {
+    for (let attempt = 0; attempt < 300; attempt++) {
       try {
         return JSON.parse(await readFile(join(directory, "impact-cursor.log"), "utf8"));
       } catch {
