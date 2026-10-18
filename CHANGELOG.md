@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.2](https://github.com/impact-tools/cli/compare/v0.2.1...v0.2.2) (2026-10-18)
+
+
+### Bug Fixes
+
+* **release:** publish npm with GitHub releases ([9ab306c](https://github.com/impact-tools/cli/commit/9ab306c893d0cfbe500e990010b1267f6ffef820))
+
 ## [0.2.1](https://github.com/impact-tools/cli/compare/v0.2.1...v0.2.1) (2026-10-17)
 
 
