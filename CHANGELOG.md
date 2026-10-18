@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.3](https://github.com/impact-tools/cli/compare/v0.2.2...v0.2.3) (2026-10-18)
+
+
+### Bug Fixes
+
+* **cli:** move logins saved on api.impactllm.com to api.impact-relay.com ([41d2cf3](https://github.com/impact-tools/cli/commit/41d2cf323da67986d73f45c41504e30fcda6a893))
+
 ## [0.2.2](https://github.com/impact-tools/cli/compare/v0.2.1...v0.2.2) (2026-10-18)
 
 
