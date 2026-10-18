@@ -72,7 +72,7 @@ jobs:
   # npm trusted publishing: npm exchanges this workflow's OIDC token for a publish token, so there is
   # no npm secret. It needs npm 11.5.1 or newer, hence Node 24.
   publish:
-    if: needs.release-please.outputs.release_created == 'true' && inputs.publish_npm == true
+    if: needs.release-please.outputs.release_created == 'true' && (github.event_name != 'workflow_dispatch' || inputs.publish_npm == true)
     needs: release-please
     runs-on: ubuntu-latest
     timeout-minutes: 5
