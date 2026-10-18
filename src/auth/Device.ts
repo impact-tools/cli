@@ -25,13 +25,20 @@ export const createDeviceClient = (baseUrl: string) =>
     fetchOptions: { redirect: "error", timeout: 15_000, headers: { "user-agent": USER_AGENT } },
   });
 
-const unreachable = () => new CliError({ message: "Cannot reach Impact to authorize this device." });
+/** Names the endpoint, so a login that fails against a stale one says so instead of leaving the user guessing. */
+const unreachable = (baseUrl?: string) => () => {
+  const where = baseUrl === undefined ? "" : ` at ${baseUrl}`;
+  return new CliError({
+    message: `Cannot reach Impact${where} to authorize this device. Check the URL, network, and TLS certificate.`,
+  });
+};
 const expired = () => new CliError({ message: "The device code expired. Run impact login again." });
 
 export const waitForDeviceToken = Effect.fn("waitForDeviceToken")(
   function* (
     client: ReturnType<typeof createDeviceClient>,
     code: { device_code: string; expires_in: number; interval?: number | undefined },
+    baseUrl?: string,
   ) {
     let interval = Math.max(1, code.interval ?? 5);
     while (true) {
@@ -42,7 +49,7 @@ export const waitForDeviceToken = Effect.fn("waitForDeviceToken")(
             { grant_type: grantType, device_code: code.device_code, client_id: CLIENT_ID },
             { signal },
           ),
-        catch: unreachable,
+        catch: unreachable(baseUrl),
       });
       if (result.data?.access_token) return result.data.access_token;
       switch (result.error?.error) {
@@ -60,7 +67,7 @@ export const waitForDeviceToken = Effect.fn("waitForDeviceToken")(
       }
     }
   },
-  (effect, _client, code) =>
+  (effect, _client, code, _baseUrl?: string | undefined) =>
     effect.pipe(Effect.timeoutOrElse({ duration: code.expires_in * 1000, orElse: () => Effect.fail(expired()) })),
 );
 
@@ -86,7 +93,10 @@ const createApiKey = Effect.fnUntraced(
       }).pipe(Layer.provide(RpcSerialization.layerNdjson)),
     ),
   Effect.mapError((error) => new CliError({ message: `Impact could not create an API key: ${error.message}` })),
-  Effect.timeoutOrElse({ duration: "30 seconds", orElse: () => Effect.fail(unreachable()) }),
+  (effect, baseUrl) =>
+    effect.pipe(
+      Effect.timeoutOrElse({ duration: "30 seconds", orElse: () => Effect.fail(unreachable(baseUrl)()) }),
+    ),
 );
 
 /**
@@ -102,7 +112,7 @@ export const deviceLogin = Effect.fn("deviceLogin")(function* <A, E, R>(
   const client = createDeviceClient(baseUrl);
   const requested = yield* Effect.tryPromise({
     try: (signal) => client.device.code({ client_id: CLIENT_ID }, { signal }),
-    catch: unreachable,
+    catch: unreachable(baseUrl),
   });
   if (!requested.data)
     return yield* new CliError({
@@ -124,7 +134,7 @@ export const deviceLogin = Effect.fn("deviceLogin")(function* <A, E, R>(
     yield* Effect.tryPromise(() => open(verifyUrl.href)).pipe(
       Effect.catch(() => output.notice("warning", "Open the URL above in your browser to continue.")),
     );
-  const session = yield* withProgress("Waiting for approval…", waitForDeviceToken(client, code));
+  const session = yield* withProgress("Waiting for approval…", waitForDeviceToken(client, code, baseUrl));
   return yield* createApiKey(baseUrl, session).pipe(
     Effect.flatMap((created) =>
       apiKey(Redacted.value(created.secret)).pipe(

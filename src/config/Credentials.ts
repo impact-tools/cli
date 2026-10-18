@@ -3,7 +3,7 @@ import envPaths from "env-paths";
 import { join, resolve } from "node:path";
 
 import { CliError, mapPlatformError } from "../Errors.ts";
-import { apiKey, baseUrl, Connection, DEFAULT_BASE_URL } from "./Connection.ts";
+import { apiKey, baseUrl, Connection, currentOrigin, DEFAULT_BASE_URL } from "./Connection.ts";
 
 const ConnectionJson = Schema.fromJsonString(Connection);
 export const configDirectory = () => resolve(process.env.IMPACT_CONFIG_DIR ?? envPaths("impact", { suffix: "" }).config);
@@ -14,7 +14,9 @@ export const readConnection = Effect.gen(function* () {
   const contents = yield* fs
     .readFileString(configFile())
     .pipe(Effect.catchReason("PlatformError", "NotFound", () => Effect.void));
-  return contents === undefined ? undefined : yield* Schema.decodeEffect(ConnectionJson)(contents);
+  if (contents === undefined) return undefined;
+  const saved = yield* Schema.decodeEffect(ConnectionJson)(contents);
+  return { ...saved, baseUrl: currentOrigin(saved.baseUrl) };
 }).pipe(
   Effect.mapError(
     () => new CliError({ message: "Cannot read the saved Impact login. Run impact login --base-url <url> again." }),

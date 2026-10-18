@@ -1,6 +1,6 @@
 import { NodeServices } from "@effect/platform-node";
 import { it as effectIt } from "@effect/vitest";
-import { Console, Effect, Fiber, Redacted, Schema, Stdio, Stream } from "effect";
+import { Cause, Console, Effect, type Exit, Fiber, Redacted, Schema, Stdio, Stream } from "effect";
 import { Command } from "effect/cli";
 import { TestClock } from "effect/testing";
 import { readFile, writeFile } from "node:fs/promises";
@@ -271,6 +271,32 @@ describe("impact login and logout", () => {
       ])
         expect(state.userAgents.get(path), path).toBe(Http.USER_AGENT);
       expect(Http.USER_AGENT).toBe(`impact-cli/${version} (${process.platform}; ${process.arch})`);
+    }),
+  );
+
+  effectIt.effect("names the endpoint it could not reach, so a stale one is easy to spot", () =>
+    Effect.gen(function* () {
+      const login = yield* impact(["login", "--no-browser", "--base-url", "http://127.0.0.1:1"]);
+      expect(login.exit._tag).toBe("Failure");
+      expect(Cause.pretty((login.exit as Exit.Failure<unknown, unknown>).cause)).toContain(
+        "Cannot reach Impact at http://127.0.0.1:1 to authorize this device",
+      );
+    }),
+  );
+
+  effectIt.effect("signs a login saved on the retired origin in again on the current one", () =>
+    Effect.gen(function* () {
+      yield* Effect.promise(() =>
+        writeFile(
+          credentials(),
+          `${JSON.stringify({ baseUrl: "https://api.impactllm.com", apiKey: secretFor(9) })}\n`,
+          { mode: 0o600 },
+        ),
+      );
+      const { base, state } = yield* Effect.promise(() => impactServer());
+      const login = yield* deviceLogin(state, base);
+      expect(login.exit._tag).toBe("Success");
+      expect(yield* saved()).toMatchObject({ baseUrl: base });
     }),
   );
 

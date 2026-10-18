@@ -4,7 +4,7 @@ import { Effect, Redacted } from "effect";
 import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 
-import { apiKey, baseUrl } from "../src/config/Connection.ts";
+import { apiKey, baseUrl, DEFAULT_BASE_URL } from "../src/config/Connection.ts";
 import {
   configDirectory,
   currentConnection,
@@ -25,6 +25,14 @@ describe("baseUrl", () => {
       assert.strictEqual(yield* baseUrl("http://impactllm.localhost:4420/v1/"), "http://impactllm.localhost:4420");
       assert.strictEqual(yield* baseUrl("https://user:secret@impact.test/v1?x=1#y"), "https://impact.test");
       assert.strictEqual(yield* baseUrl("http://127.0.0.1:4420"), "http://127.0.0.1:4420");
+    }),
+  );
+
+  it.effect("names the current origin for the one Impact answered on before it moved", () =>
+    Effect.gen(function* () {
+      assert.strictEqual(yield* baseUrl("https://api.impactllm.com"), DEFAULT_BASE_URL);
+      assert.strictEqual(yield* baseUrl("https://api.impactllm.com/v1/"), DEFAULT_BASE_URL);
+      assert.strictEqual(yield* baseUrl("https://api.impact-relay.com"), DEFAULT_BASE_URL);
     }),
   );
 
@@ -96,6 +104,17 @@ describe("credentials", () => {
       assert.strictEqual(yield* resolveEndpoint(saved), "https://env.test");
       assert.strictEqual(yield* resolveEndpoint(saved, "https://flag.test/v1"), "https://flag.test");
     }),
+  );
+
+  it.effect("moves a login saved on the retired origin to the current one, so a new login and every command reach Impact", () =>
+    Effect.gen(function* () {
+      yield* saveConnection({ baseUrl: "https://api.impactllm.com", apiKey: Redacted.make(key) });
+      const saved = yield* readConnection;
+      assert.strictEqual(saved?.baseUrl, DEFAULT_BASE_URL);
+      assert.strictEqual(yield* resolveEndpoint(saved), DEFAULT_BASE_URL);
+      assert.strictEqual((yield* currentConnection).baseUrl, DEFAULT_BASE_URL);
+      yield* removeConnection;
+    }).pipe(Effect.provide(NodeServices.layer)),
   );
 
   it.effect("reports corrupt credentials but accepts an explicit endpoint and key", () =>
