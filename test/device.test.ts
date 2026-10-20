@@ -284,22 +284,6 @@ describe("impact login and logout", () => {
     }),
   );
 
-  effectIt.effect("signs a login saved on the retired origin in again on the current one", () =>
-    Effect.gen(function* () {
-      yield* Effect.promise(() =>
-        writeFile(
-          credentials(),
-          `${JSON.stringify({ baseUrl: "https://api.impactllm.com", apiKey: secretFor(9) })}\n`,
-          { mode: 0o600 },
-        ),
-      );
-      const { base, state } = yield* Effect.promise(() => impactServer());
-      const login = yield* deviceLogin(state, base);
-      expect(login.exit._tag).toBe("Success");
-      expect(yield* saved()).toMatchObject({ baseUrl: base });
-    }),
-  );
-
   effectIt.effect("revokes the key of the login it replaces once the new key is saved", () =>
     Effect.gen(function* () {
       const { base, state } = yield* Effect.promise(() => impactServer());

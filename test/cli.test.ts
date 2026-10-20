@@ -257,9 +257,51 @@ describe("impact", () => {
       TERM: "xterm-256color",
     });
     expect(result.stdout).toBe(
-      `Impact: ${endpoint}\nModels: 2\nantigravity: not installed\nclaude: ${fixture}\ncodex: not installed\ncursor: not installed\nkilo: ${fixture}\nopencode: not installed\n`,
+      `Config folder: ${environment.directory}\nImpact: ${endpoint}\nModels: 2\nantigravity: not installed\nclaude: ${fixture}\ncodex: not installed\ncursor: not installed\nkilo: ${fixture}\nopencode: not installed\n`,
     );
     expect(result.stderr).toBe("");
+  });
+
+  describe("doctor without a working login", () => {
+    const noClients = () =>
+      Object.fromEntries(
+        ["ANTIGRAVITY", "CLAUDE", "CODEX", "CURSOR", "KILO", "OPENCODE"].map((name) => [
+          `IMPACT_${name}_BIN`,
+          join(environment.directory, "missing-client"),
+        ]),
+      );
+    const clientLines = (names: string[]) => names.map((name) => `${name}: not installed\n`).join("");
+    const allClients = clientLines(["antigravity", "claude", "codex", "cursor", "kilo", "opencode"]);
+
+    it("shows the config folder and the clients when nobody is signed in", async () => {
+      const result = await impact(["doctor"], { IMPACT_API_KEY: "", ...noClients() });
+      expect(result.stdout).toBe(
+        `Config folder: ${environment.directory}\nConnection: Run impact login, or set IMPACT_API_KEY.\n${allClients}`,
+      );
+      expect(result.stderr).toBe("");
+      expect(requests).toEqual([]);
+    });
+
+    it("shows the config folder that IMPACT_CONFIG_DIR names", async () => {
+      const directory = join(environment.directory, "elsewhere");
+      const result = await impact(["doctor"], { IMPACT_API_KEY: "", IMPACT_CONFIG_DIR: directory, ...noClients() });
+      expect(result.stdout).toContain(`Config folder: ${directory}\n`);
+    });
+
+    it("reports an unreadable saved login instead of stopping", async () => {
+      await writeFile(join(environment.directory, "credentials.json"), "{");
+      const result = await impact(["doctor"], { IMPACT_API_KEY: "", ...noClients() });
+      expect(result.stdout).toBe(
+        `Config folder: ${environment.directory}\nConnection: Cannot read the saved Impact login. Run impact login --base-url <url> again.\n${allClients}`,
+      );
+    });
+
+    it("names the endpoint it could not reach and still lists the clients", async () => {
+      const result = await impact(["doctor"], { IMPACT_BASE_URL: "http://127.0.0.1:1", ...noClients() });
+      expect(result.stdout).toBe(
+        `Config folder: ${environment.directory}\nConnection: Cannot reach Impact at http://127.0.0.1:1. Check the URL, network, and TLS certificate.\n${allClients}`,
+      );
+    });
   });
 
   const cursorEnv = (extra: NodeJS.ProcessEnv = {}) => ({

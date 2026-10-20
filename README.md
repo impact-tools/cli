@@ -58,7 +58,7 @@ Source layout, under `src/`:
 - `commands/` defines the commands and `Command.ts` assembles them; `impact helper …` are unlisted commands that clients call back during a launch.
 - `clients/` has one folder per client, plus `Launch.ts` (the list and the runner) and `Client.ts` (what they share). Kilo and OpenCode share `clients/opencode/`.
 - `proxy/` is the background proxy for Cursor, Codex and Antigravity: its files, the process and its control requests.
-- `auth/` is device authorization and key input; `config/` validates connections and stores credentials, and maps the retired `api.impactllm.com` origin to the current one.
+- `auth/` is device authorization and key input; `config/` validates connections and stores credentials.
 - `api/` calls Impact: `Http.ts` makes authenticated JSON requests, the rest read models, usage and spend.
 - `schemas/` is the API contract and model catalog, copied from the gateway's shared schemas so this repository builds alone. Keep it in sync when the gateway's API changes.
 - `process/` builds the command lines clients use to call back into this CLI.
