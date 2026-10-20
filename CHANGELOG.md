@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.4](https://github.com/impact-tools/cli/compare/v0.2.3...v0.2.4) (2026-10-20)
+
+
+### Bug Fixes
+
+* **cli:** enhance 'doctor' command to display config folder and improve connection error handling; update README and schemas with new model details ([ecd097a](https://github.com/impact-tools/cli/commit/ecd097a517bbe9cbf348359d37e9e759ee4382c6))
+
 ## [0.2.3](https://github.com/impact-tools/cli/compare/v0.2.2...v0.2.3) (2026-10-18)
 
 
