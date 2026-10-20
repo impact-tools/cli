@@ -60,7 +60,7 @@ Source layout, under `src/`:
 - `proxy/` is the background proxy for Cursor, Codex and Antigravity: its files, the process and its control requests.
 - `auth/` is device authorization and key input; `config/` validates connections and stores credentials.
 - `api/` calls Impact: `Http.ts` makes authenticated JSON requests, the rest read models, usage and spend.
-- `schemas/` is the API contract and model catalog, copied from the gateway's shared schemas so this repository builds alone. Keep it in sync when the gateway's API changes.
+- `schemas/` is the API contract, copied from the gateway's shared schemas so this repository builds alone. Keep it in sync when the gateway's API changes. It carries no model catalog: the models, their names and prices come from `GET /v1/models` on every launch, so a new or repriced model never needs a CLI release. `ModelVocabulary.ts` holds only what doesn't change with the catalog (reasoning efforts, Claude's alternative spellings).
 - `process/` builds the command lines clients use to call back into this CLI.
 
 Built on [Effect](https://effect.website): argument parsing, HTTP and the scoped cleanup of processes, sockets and temporary files. The Node platform process spawner lets both the Node bundle and the compiled Bun executable run.

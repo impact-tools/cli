@@ -4,7 +4,7 @@ import type { Connection } from "../../config/Connection.ts";
 
 import { getJson } from "../../api/Http.ts";
 import { CliError } from "../../Errors.ts";
-import { catalogModel, MODEL_EFFORTS } from "../../schemas/Catalog.ts";
+import { MODEL_EFFORTS } from "../../schemas/ModelVocabulary.ts";
 
 const Tokens = Schema.Int.check(Schema.isGreaterThan(0));
 const Price = Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0));
@@ -48,7 +48,7 @@ export const openCodeModels = Effect.fn("openCodeModels")(function* (connection:
         model.id,
         {
           id: model.id,
-          name: model.display_name ?? catalogModel(model.id)?.name ?? model.id,
+          name: model.display_name ?? model.id,
           tool_call: model.capabilities.includes("tools"),
           reasoning,
           variants: variants(model.reasoning_efforts),

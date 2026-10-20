@@ -73,9 +73,10 @@ const ModelListPricing = Schema.Struct({
   unit: Schema.Literal("usd_per_1m_tokens"),
 });
 
-/** A row of the OpenAI-shaped list. `owned_by` is the model's brand. */
+/** A row of the OpenAI-shaped list. `owned_by` is the model's brand; `display_name` is what pickers show. */
 const OpenAiModel = Schema.Struct({
   id: Schema.String,
+  display_name: Schema.String,
   object: Schema.Literal("model"),
   created: Count,
   owned_by: Schema.String,

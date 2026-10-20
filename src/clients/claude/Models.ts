@@ -4,7 +4,7 @@ import type { Connection } from "../../config/Connection.ts";
 
 import { getJson } from "../../api/Http.ts";
 import { CliError } from "../../Errors.ts";
-import { catalogAliases } from "../../schemas/Catalog.ts";
+import { claudeAliases } from "../../schemas/ModelVocabulary.ts";
 
 const Catalog = Schema.Struct({
   data: Schema.Array(
@@ -30,14 +30,19 @@ const CompactSettings = Schema.Struct({
   ),
 });
 
+/**
+ * The listed model a `--model` or settings value names. The list doesn't say which models are pinned
+ * to a dated snapshot, so a `-YYYYMMDD` suffix on any Claude model's name selects the model itself.
+ */
 export function selectedModel(models: readonly Model[], id: string | undefined): Model | undefined {
   if (id === undefined || id.includes("/")) return undefined;
-  return (
-    models.find((model) => model.id === id) ??
-    models.find((model) =>
-      catalogAliases({ id: model.id, contextTokens: model.max_input_tokens ?? 0 }).includes(id.toLowerCase()),
-    )
-  );
+  const named = (name: string) =>
+    models.find(
+      (model) =>
+        model.id === name || claudeAliases({ id: model.id, contextTokens: model.max_input_tokens ?? 0 }).includes(name),
+    );
+  const lowered = id.toLowerCase();
+  return models.find((model) => model.id === id) ?? named(lowered) ?? named(lowered.replace(/-\d{8}(?=\[1m\]$|$)/, ""));
 }
 
 /** Compaction windows for non-Claude models that Claude Code does not know, unless the user chose a fitting one. */

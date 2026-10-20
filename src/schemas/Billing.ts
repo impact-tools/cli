@@ -1,8 +1,8 @@
 import { Schema } from "effect";
 import { Rpc } from "effect/rpc";
 
-import { CATALOG, DEFAULT_SEARCH_EFFORT, SEARCH_EFFORTS, SEARCH_MODEL_ID, searchTarget } from "./Catalog.ts";
 import { Forbidden, NotFound } from "./Errors.ts";
+import { DEFAULT_SEARCH_EFFORT, SEARCH_EFFORTS, SEARCH_MODEL_ID } from "./ModelVocabulary.ts";
 
 /** Instants are Unix ms; money is micro-USD integers throughout. */
 const Instant = Schema.Finite;
@@ -51,13 +51,6 @@ export const DEFAULT_KEY_TOOLS: KeyTools = {
   vision: true,
 };
 
-/** A key's stored tools as they apply now, with the search model resolved by {@link searchTarget}. */
-export const keyTools = (stored: Partial<KeyTools>): KeyTools => {
-  const tools = { ...DEFAULT_KEY_TOOLS, ...stored };
-  const target = searchTarget(tools.searchModel, tools.searchEffort);
-  return { ...tools, searchModel: target.model.id, searchEffort: target.effort };
-};
-
 /** How far smart routing may push reasoning: a cap on the effort it picks from a target's ladder. */
 const ROUTING_CEILINGS = ["low", "medium", "high", "max"] as const;
 export type RoutingCeiling = (typeof ROUTING_CEILINGS)[number];
@@ -76,14 +69,6 @@ export const DEFAULT_KEY_ROUTING: KeyRouting = {
   enabled: false,
   targets: ["gpt-6.1-sol", "gpt-5.6-sol", "gpt-5.6-luna"],
   ceiling: "max",
-};
-
-const KNOWN_MODELS = new Set(CATALOG.map((model) => model.id));
-
-/** A key's stored routing with targets the catalog no longer lists left out. */
-export const keyRouting = (stored: Partial<KeyRouting>): KeyRouting => {
-  const routing = { ...DEFAULT_KEY_ROUTING, ...stored };
-  return { ...routing, targets: routing.targets.filter((id) => KNOWN_MODELS.has(id)) };
 };
 
 /** Every key starts `sk-imp-`; the rest is random. */

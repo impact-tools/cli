@@ -71,6 +71,16 @@ describe("selectedModel", () => {
     assert.isUndefined(selectedModel([{ ...canonical, max_input_tokens: 200_000 }], "opus-5.5[1m]"));
     assert.isUndefined(selectedModel([{ id: canonical.id }], "opus-5.5[1m]"));
   });
+
+  it("selects a model by a dated snapshot spelling although the list never names its snapshot", () => {
+    const haiku = { id: "claude-haiku-4-5", max_input_tokens: 200_000 };
+    for (const id of ["claude-haiku-4-5-20251001", "claude-haiku-4.5-20251001", "CLAUDE-HAIKU-4-5-20251001"])
+      assert.strictEqual(selectedModel([haiku], id), haiku);
+    const opus = { id: "claude-opus-5-5", max_input_tokens: 1_000_000 };
+    assert.strictEqual(selectedModel([opus], "claude-opus-5-5-20260101[1m]"), opus);
+    assert.isUndefined(selectedModel([haiku], "claude-sonnet-4-5-20250929"));
+    assert.isUndefined(selectedModel([haiku], "claude-haiku-4-5-20251001[1m]"));
+  });
 });
 
 describe("prepareClaude", () => {

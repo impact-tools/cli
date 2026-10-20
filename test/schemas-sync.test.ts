@@ -20,6 +20,13 @@ const files = (directory: string): string[] =>
     entry.isDirectory() ? files(join(directory, entry.name)) : [join(directory, entry.name)],
   );
 
+describe("model data", () => {
+  it("is not embedded: models, prices and names come from GET /v1/models, so a new model needs no release", () => {
+    assert.isFalse(existsSync(join(copies, "Catalog.ts")));
+    assert.isFalse(existsSync(join(copies, "catalog")));
+  });
+});
+
 describe.skipIf(!existsSync(sources))("copied API contract", () => {
   const copied = files(copies)
     .map((path) => relative(copies, path))
@@ -27,7 +34,7 @@ describe.skipIf(!existsSync(sources))("copied API contract", () => {
 
   it("copies a contract that is there", () => {
     assert.isAbove(copied.length, 0);
-    for (const path of ["V1.ts", "Spend.ts", "Catalog.ts", "Billing.ts"]) assert.include(copied, path);
+    for (const path of ["V1.ts", "Spend.ts", "Billing.ts", "ModelVocabulary.ts"]) assert.include(copied, path);
   });
 
   it.each(copied)("%s matches packages/schemas byte for byte", (path) => {
