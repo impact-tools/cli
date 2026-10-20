@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/impact-tools/cli/compare/v0.2.4...v0.3.0) (2026-10-20)
+
+
+### Features
+
+* replace Catalog with ModelVocabulary for model definitions; update README and related files to reflect changes in model handling and aliases ([a109413](https://github.com/impact-tools/cli/commit/a109413008555476875ae3eaf05ab7686f23d7c8))
+
 ## [0.2.4](https://github.com/impact-tools/cli/compare/v0.2.3...v0.2.4) (2026-10-20)
 
 
