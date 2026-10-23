@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/impact-tools/cli/compare/v0.3.0...v0.3.1) (2026-10-23)
+
+
+### Bug Fixes
+
+* **claude:** size the context for models picked after launch ([bcbda9d](https://github.com/impact-tools/cli/commit/bcbda9da99d82335bf1a88f26b921a7eb3b52040))
+
 ## [0.3.0](https://github.com/impact-tools/cli/compare/v0.2.4...v0.3.0) (2026-10-20)
 
 
