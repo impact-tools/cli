@@ -5,7 +5,7 @@ import { readFile, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { parseClaudeArgs } from "../src/clients/claude/Config.ts";
-import { claudeModels, modelWindows, selectedModel } from "../src/clients/claude/Models.ts";
+import { claudeModels, modelWindows, selectedModel, unknownModelContext } from "../src/clients/claude/Models.ts";
 import { prepareClaude } from "../src/clients/claude/Prepare.ts";
 import { isolatedEnvironment } from "./support/Environment.ts";
 import { catalog, connection, impactHttp, key } from "./support/Impact.ts";
@@ -55,6 +55,29 @@ describe("modelWindows", () => {
       modelWindows(catalog.data, { modelSettings: { "gpt-6.1-sol": { autoCompactWindow: "auto" } } }),
       {},
     );
+  });
+});
+
+describe("unknownModelContext", () => {
+  const sonnet = { id: "claude-sonnet-5-5", max_input_tokens: 200_000 };
+  const glm = { id: "glm-5.3-flash-uncensored", max_input_tokens: 1_048_576 };
+  const gpt = { id: "gpt-6.1-sol", max_input_tokens: 272_000 };
+
+  it("covers every non-Claude model a session may switch to, not only the one it starts with", () => {
+    assert.strictEqual(unknownModelContext([sonnet, glm, gpt], undefined), 1_000_000);
+    assert.strictEqual(unknownModelContext([sonnet, glm, gpt], sonnet), 1_000_000);
+    assert.strictEqual(unknownModelContext([sonnet, gpt], sonnet), 272_000);
+  });
+
+  it("keeps the selected model's own window, above the 1M compaction cap too", () => {
+    const longSonnet = { ...sonnet, max_input_tokens: 1_000_000 };
+    assert.strictEqual(unknownModelContext([sonnet, glm], glm), 1_048_576);
+    assert.strictEqual(unknownModelContext([longSonnet, gpt], longSonnet), 1_000_000);
+  });
+
+  it("leaves Claude's default when no model needs another", () => {
+    assert.isUndefined(unknownModelContext([sonnet], undefined));
+    assert.isUndefined(unknownModelContext([{ id: "small", max_input_tokens: 32_000 }], undefined));
   });
 });
 
@@ -166,6 +189,15 @@ describe("prepareClaude", () => {
       assert.notProperty(settings.env, "ANTHROPIC_MODEL");
       assert.notProperty(settings.env, "ANTHROPIC_DEFAULT_OPUS_MODEL");
       assert.strictEqual(env.ANTHROPIC_DEFAULT_OPUS_MODEL, "custom-opus");
+      assert.strictEqual(settings.env.CLAUDE_CODE_MAX_CONTEXT_TOKENS, "272000");
+      assert.strictEqual(settings.modelSettings["gpt-6.1-sol"].autoCompactWindow, 272_000);
+    }).pipe(Effect.scoped, Effect.provide(services)),
+  );
+
+  it.effect("sizes the context for a non-Claude model picked after launch", () =>
+    Effect.gen(function* () {
+      const { settings, env } = yield* prepare([]);
+      assert.strictEqual(env.CLAUDE_CODE_MAX_CONTEXT_TOKENS, "272000");
       assert.strictEqual(settings.env.CLAUDE_CODE_MAX_CONTEXT_TOKENS, "272000");
       assert.strictEqual(settings.modelSettings["gpt-6.1-sol"].autoCompactWindow, 272_000);
     }).pipe(Effect.scoped, Effect.provide(services)),

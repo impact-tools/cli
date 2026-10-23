@@ -45,6 +45,15 @@ export function selectedModel(models: readonly Model[], id: string | undefined):
   return models.find((model) => model.id === id) ?? named(lowered) ?? named(lowered.replace(/-\d{8}(?=\[1m\]$|$)/, ""));
 }
 
+/**
+ * The compaction window a non-Claude model gets: its own context, within the 100k to 1M range
+ * Claude Code accepts for `autoCompactWindow`. Claude models and smaller ones are left to Claude.
+ */
+const ownWindow = (model: Model) =>
+  model.id.startsWith("claude-") || !model.max_input_tokens || model.max_input_tokens < 100_000
+    ? undefined
+    : Math.min(model.max_input_tokens, 1_000_000);
+
 /** Compaction windows for non-Claude models that Claude Code does not know, unless the user chose a fitting one. */
 export function modelWindows(models: readonly Model[], settings: Record<string, unknown>) {
   const saved: typeof CompactSettings.Type = Option.getOrElse(
@@ -53,13 +62,27 @@ export function modelWindows(models: readonly Model[], settings: Record<string, 
   );
   return Object.fromEntries(
     models.flatMap((model) => {
-      if (model.id.startsWith("claude-") || !model.max_input_tokens || model.max_input_tokens < 100_000) return [];
-      const maximum = Math.min(model.max_input_tokens, 1_000_000);
+      const maximum = ownWindow(model);
+      if (maximum === undefined) return [];
       const selected = saved.modelSettings?.[model.id]?.autoCompactWindow ?? saved.autoCompactWindow;
       if (selected === "auto" || typeof selected === "number" && selected <= maximum) return [];
       return [[model.id, { autoCompactWindow: maximum }]];
     }),
   );
+}
+
+/**
+ * `CLAUDE_CODE_MAX_CONTEXT_TOKENS`: the context Claude Code assumes for every model it doesn't know
+ * (200k without it), one value for the whole session. A model picked later with `/model` gets it
+ * too, so it is the largest window the launch may need: the selected model's, or any non-Claude
+ * model's. Claude Code compacts within the smaller of it and a model's `autoCompactWindow`, so each
+ * smaller model is still held to its own.
+ */
+export function unknownModelContext(models: readonly Model[], selected: Model | undefined) {
+  const windows = [selected?.max_input_tokens, ...models.map(ownWindow)].filter(
+    (window): window is number => window !== undefined,
+  );
+  return windows.length === 0 ? undefined : Math.max(...windows);
 }
 
 export const claudeModels = Effect.fn("claudeModels")(function* (connection: Connection) {
