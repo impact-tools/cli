@@ -56,7 +56,10 @@ class LiteralParser {
       this.offset++;
       return !this.value();
     }
-    const number = /^-?\d+(?:\.\d+)?/.exec(this.source.slice(this.offset));
+    // Bundles may emit large field numbers in exponent notation, e.g. no:1e3.
+    const number = /^-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/.exec(
+      this.source.slice(this.offset),
+    );
     if (number) {
       this.offset += number[0].length;
       return Number(number[0]);
@@ -145,7 +148,7 @@ export class CursorWire {
       }
     }
     const aliases = Array.from(
-      source.matchAll(/(?:^|[,;])([\w$]+)=([\w$]+)(?=[,;])/g),
+      source.matchAll(/(?:^|[,;{])([\w$]+)=([\w$]+)(?=[,;})])/g),
     );
     for (let pass = 0; pass < 3; pass++)
       for (const alias of aliases) {
@@ -157,15 +160,20 @@ export class CursorWire {
     const pattern =
       /([\w$]+)=[\w$]+\.make(MessageType|Enum)\("([^"]+)",\s*(?:\(\)=>)?/g;
     for (const match of source.matchAll(pattern)) {
-      const parser = new LiteralParser(
-        source.slice(match.index! + match[0].length),
-      );
-      const fields = parser.value();
-      if (!Array.isArray(fields))
-        throw new Error(`Invalid descriptor ${match[3]}`);
-      if (match[2] === "Enum")
-        symbols.set(match[1]!, proto3.makeEnumType(match[3]!, fields));
-      else declarations.push({ symbol: match[1]!, name: match[3]!, fields });
+      try {
+        const parser = new LiteralParser(
+          source.slice(match.index! + match[0].length),
+        );
+        const fields = parser.value();
+        if (!Array.isArray(fields))
+          throw new Error(`Invalid descriptor ${match[3]}`);
+        if (match[2] === "Enum")
+          symbols.set(match[1]!, proto3.makeEnumType(match[3]!, fields));
+        else declarations.push({ symbol: match[1]!, name: match[3]!, fields });
+      } catch {
+        // Newer bundles can emit descriptor shapes the literal parser does not
+        // cover yet; skip the single declaration instead of failing the parse.
+      }
     }
     for (const declaration of declarations) {
       const type = proto3.makeMessageType(declaration.name, () =>

@@ -57,6 +57,36 @@ describe("Cursor installed descriptor codecs", () => {
       "Cursor descriptor missing",
     );
   });
+  it("parses exponent-notation field numbers and skips unsupported declarations", () => {
+    // October 2026 Cursor bundles emit large field numbers as 1e3 and can
+    // contain descriptor shapes the literal parser does not cover yet.
+    const wire = CursorWire.fromBundle(
+      fixture.replace("{no:2,name:\"reply\"", "{no:1e3,name:\"reply\"") +
+        `,X=A.makeMessageType("agent.v1.UnsupportedShape",()=>unsupported());`,
+    );
+    const result = wire.decode(
+      "agent.v1.AgentClientMessage",
+      wire.encode("agent.v1.AgentClientMessage", {
+        message: {
+          case: "reply",
+          value: { state: 1, chunks: [new Uint8Array([3])] },
+        },
+      }),
+    );
+    expect(result.message.case).toBe("reply");
+    expect(result.message.value.state).toBe(1);
+    expect(Array.from(result.message.value.chunks[0])).toEqual([3]);
+    expect(wire.type("agent.v1.AgentClientMessage")).toBeTruthy();
+    expect(() => wire.type("agent.v1.UnsupportedShape")).toThrow(
+      "Cursor descriptor missing",
+    );
+  });
+  it("resolves type aliases followed by braces from minified bundles", () => {
+    const wire = CursorWire.fromBundle(
+      `${fixture}T={no:1,name:"state",kind:"enum",T:A.getEnumType(E)};U=T;`,
+    );
+    expect(wire.type("agent.v1.AgentServerMessage")).toBeTruthy();
+  });
   it.skipIf(!existsSync("/Applications/Cursor.app"))(
     "roundtrips actual installed agent and model schemas",
     async () => {
