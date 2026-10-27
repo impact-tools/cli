@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.2](https://github.com/impact-tools/cli/compare/v0.3.1...v0.3.2) (2026-10-27)
+
+
+### Bug Fixes
+
+* **cursor:** parse October 2026 bundle descriptors ([9e1c081](https://github.com/impact-tools/cli/commit/9e1c08138bd9cddc0ff7668c7a37cae1b6885c44))
+* **cursor:** parse October 2026 bundle descriptors ([e3a6151](https://github.com/impact-tools/cli/commit/e3a6151bdef536e62d3addccbe4a7b32fd4b3aa9))
+
 ## [0.3.1](https://github.com/impact-tools/cli/compare/v0.3.0...v0.3.1) (2026-10-23)
 
 
