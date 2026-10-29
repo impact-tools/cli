@@ -1,3 +1,5 @@
+import { MCP_SERVER_IDS, MCP_SERVERS } from "../../setup/Mcp.ts";
+
 /**
  * Every Impact route Codex calls, under both of its bases: the provider's `/v1` and the ChatGPT
  * backend's `/backend-api/codex`. The proxy forwards exactly these paths.
@@ -8,6 +10,9 @@ export const CODEX_ROUTES: readonly string[] = [
   ...["/v1", "/backend-api/codex"].flatMap((base) => NATIVE.map((path) => `${base}/${path}`)),
   "/api/codex/usage",
 ];
+
+/** Impact's MCP servers (`impact mcp enable`), which Codex reaches through the proxy so it never holds the key. */
+export const CODEX_MCP_ROUTES: readonly string[] = MCP_SERVER_IDS.map((server) => MCP_SERVERS[server].path);
 
 /**
  * Impact routes the Codex proxy deliberately refuses, with the reason. A path ending in `/*` closes
@@ -25,7 +30,7 @@ export const CLOSED_CODEX_ROUTES: Readonly<Record<string, string>> = {
   "/backend-api/codex/alpha/*": "server-side context management is off on Impact",
 };
 
-const forwarded = new Set(CODEX_ROUTES);
+const forwarded = new Set([...CODEX_ROUTES, ...CODEX_MCP_ROUTES]);
 
 /** `path` without its query. */
 export const pathname = (path: string) => path.split("?", 1)[0] ?? path;

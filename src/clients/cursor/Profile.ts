@@ -15,6 +15,7 @@ import {
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { hostname } from "node:os";
 import { CliError, mapPlatformError } from "../../Errors.ts";
+import { openSqlite } from "../../process/Sqlite.ts";
 import { mirrorCursorProfile, type Overrides } from "./Mirror.ts";
 
 const REACTIVE =
@@ -273,8 +274,7 @@ const seed = async (
   modelIds: readonly string[],
   disabledExtensions: string | null | undefined,
 ) => {
-  const { DatabaseSync } = await import("node:sqlite");
-  const db = new DatabaseSync(path);
+  const db = await openSqlite(path);
   try {
     db.exec(
       "PRAGMA busy_timeout=1000; CREATE TABLE IF NOT EXISTS ItemTable (key TEXT UNIQUE ON CONFLICT REPLACE, value BLOB); BEGIN IMMEDIATE",

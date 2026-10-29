@@ -14,6 +14,8 @@ import {
 } from "node:fs";
 import { dirname, join } from "node:path";
 
+import { openSqlite } from "../../process/Sqlite.ts";
+
 /** Settings the launcher always owns; they are never mirrored or preserved. */
 export type Overrides = ReadonlyArray<readonly [string, unknown]>;
 
@@ -166,8 +168,7 @@ const shareExtensions = (source: string, target: string, profile: string) => {
 /** Cursor keeps disabled extensions in application state; read the running profile's copy only. */
 const readDisabled = async (path: string): Promise<string | undefined> => {
   if (!regularFile(path)) return undefined;
-  const { DatabaseSync } = await import("node:sqlite");
-  const db = new DatabaseSync(path, { readOnly: true });
+  const db = await openSqlite(path, { readOnly: true });
   try {
     db.exec("PRAGMA busy_timeout=1000");
     const row = db.prepare("SELECT value FROM ItemTable WHERE key = ?").get(DISABLED) as
@@ -183,8 +184,7 @@ const readDisabled = async (path: string): Promise<string | undefined> => {
 };
 const writeDisabled = async (path: string, value: string | undefined) => {
   mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
-  const { DatabaseSync } = await import("node:sqlite");
-  const db = new DatabaseSync(path);
+  const db = await openSqlite(path);
   try {
     db.exec(
       "PRAGMA busy_timeout=1000; CREATE TABLE IF NOT EXISTS ItemTable (key TEXT UNIQUE ON CONFLICT REPLACE, value BLOB)",

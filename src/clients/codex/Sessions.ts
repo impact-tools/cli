@@ -1,25 +1,14 @@
 import { Effect, FileSystem } from "effect";
 import { join, relative, sep } from "node:path";
-import { DatabaseSync } from "node:sqlite";
 
 import { mapPlatformError, CliError } from "../../Errors.ts";
+import { openSqlite } from "../../process/Sqlite.ts";
 
 type ThreadRow = { readonly rollout_path: string };
 
-/** Bun needs write access to create missing WAL sidecars; query_only protects the index itself. */
+/** Codex's shared index is only read; `readOnly` keeps it that way on either runtime. */
 const readRolloutPaths = async (path: string): Promise<ThreadRow[]> => {
-  if (process.versions.bun) {
-    const { Database } = await import("bun:sqlite");
-    const db = new Database(path, { readwrite: true, create: false });
-    try {
-      db.exec("PRAGMA query_only=ON");
-      if (!db.query("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'threads'").get()) return [];
-      return db.query("SELECT DISTINCT rollout_path FROM threads WHERE rollout_path IS NOT NULL").all() as ThreadRow[];
-    } finally {
-      db.close();
-    }
-  }
-  const db = new DatabaseSync(path, { readOnly: true });
+  const db = await openSqlite(path, { readOnly: true });
   try {
     if (!db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'threads'").get()) return [];
     return db.prepare("SELECT DISTINCT rollout_path FROM threads WHERE rollout_path IS NOT NULL").all() as ThreadRow[];
@@ -39,7 +28,8 @@ export const restoreCodexSessionAliases = Effect.fn("restoreCodexSessionAliases"
   for (const entry of entries.filter((name) => /^state_\d+\.sqlite$/.test(name))) {
     const paths = yield* Effect.tryPromise({
       try: () => readRolloutPaths(join(sqliteHome, entry)),
-      catch: (cause) => new CliError({ message: `Skipping Codex session index ${join(sqliteHome, entry)}: ${String(cause)}` }),
+      catch: (cause) =>
+        new CliError({ message: `Skipping Codex session index ${join(sqliteHome, entry)}: ${String(cause)}` }),
     }).pipe(Effect.catch((error) => Effect.logWarning(error.message).pipe(Effect.as([] as ThreadRow[]))));
     const aliases = new Set<string>();
     for (const { rollout_path } of paths) {
@@ -54,9 +44,9 @@ export const restoreCodexSessionAliases = Effect.fn("restoreCodexSessionAliases"
         const link = join(directory, name);
         if (yield* fs.exists(link)) continue;
         yield* fs.makeDirectory(join(source, name), { recursive: true });
-        yield* fs.symlink(join(source, name), link).pipe(
-          Effect.catchReason("PlatformError", "AlreadyExists", () => Effect.void),
-        );
+        yield* fs
+          .symlink(join(source, name), link)
+          .pipe(Effect.catchReason("PlatformError", "AlreadyExists", () => Effect.void));
       }
     }
   }

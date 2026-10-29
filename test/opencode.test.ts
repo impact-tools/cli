@@ -1,3 +1,4 @@
+import { NodeServices } from "@effect/platform-node";
 import { assert, describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
 
@@ -12,7 +13,8 @@ describe.each([
   { client: "OpenCode", prepareClient: prepareOpenCode, variable: "OPENCODE_CONFIG_CONTENT" },
   { client: "Kilo", prepareClient: prepareKilo, variable: "KILO_CONFIG_CONTENT" },
 ] as const)("$client configuration", ({ prepareClient, variable }) => {
-  const prepare = (args: readonly string[] = []) => prepareClient({ executable: "client", args, connection });
+  const prepare = (args: readonly string[] = []) =>
+    prepareClient({ executable: "client", args, connection }).pipe(Effect.provide(NodeServices.layer));
   const settingsOf = (env: NodeJS.ProcessEnv) => JSON.parse(env[variable]!);
 
   it.effect("selects an explicit Impact model and keeps all client flags", () =>

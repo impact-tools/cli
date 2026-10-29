@@ -4,7 +4,8 @@ import type { Connection } from "../../config/Connection.ts";
 
 import { getJson } from "../../api/Http.ts";
 import { CliError } from "../../Errors.ts";
-import { MODEL_EFFORTS } from "../../schemas/ModelVocabulary.ts";
+import { fromModelList } from "../../setup/Models.ts";
+import { openCodeModel } from "../../setup/OpenCode.ts";
 
 const Tokens = Schema.Int.check(Schema.isGreaterThan(0));
 const Price = Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0));
@@ -28,42 +29,17 @@ const Catalog = Schema.Struct({
   ),
 });
 
-/** OpenCode adds its own efforts to reasoning models; Kilo doesn't. Both drop disabled variants. */
-const variants = (efforts: readonly string[]) => ({
-  ...Object.fromEntries(MODEL_EFFORTS.map((effort) => [effort, { disabled: true }])),
-  ...Object.fromEntries(efforts.map((effort) => [effort, { reasoningEffort: effort }])),
-});
-
-/** Model definitions in the provider format OpenCode and its fork Kilo share. */
-export const openCodeModels = Effect.fn("openCodeModels")(function* (connection: Connection) {
+/** Impact's models from `GET /v1/models`, as the setup generator describes them. */
+export const impactModels = Effect.fn("impactModels")(function* (connection: Connection) {
   const catalog = yield* getJson(connection, "/v1/models", Catalog, {
     invalid: "Impact returned an invalid OpenCode model catalog.",
   });
   if (catalog.data.length === 0) return yield* new CliError({ message: "Impact has no enabled models." });
-  return Object.fromEntries(
-    catalog.data.map((model) => {
-      const reasoning = model.reasoning_efforts.some((effort) => effort !== "none");
-      const vision = model.capabilities.includes("vision");
-      return [
-        model.id,
-        {
-          id: model.id,
-          name: model.display_name ?? model.id,
-          tool_call: model.capabilities.includes("tools"),
-          reasoning,
-          variants: variants(model.reasoning_efforts),
-          attachment: vision,
-          modalities: { input: vision ? ["text", "image"] : ["text"], output: ["text"] },
-          ...(reasoning ? { interleaved: { field: "reasoning_content" } } : {}),
-          limit: { context: model.context_length, output: model.max_output_tokens },
-          cost: {
-            input: model.pricing.input,
-            output: model.pricing.output,
-            cache_read: model.pricing.cached_input,
-            cache_write: model.pricing.cache_write,
-          },
-        },
-      ] as const;
-    }),
-  );
+  return fromModelList(catalog.data);
 });
+
+/** Model definitions in the provider format OpenCode and its fork Kilo share, by id. */
+export const openCodeModels = (connection: Connection) =>
+  impactModels(connection).pipe(
+    Effect.map((models) => Object.fromEntries(models.map((model) => [model.id, openCodeModel(model)]))),
+  );

@@ -12,15 +12,17 @@ import { prepareAntigravity } from "./antigravity/Prepare.ts";
 import { executableVariable, findExecutable } from "./Client.ts";
 import { prepareCodex } from "./codex/Prepare.ts";
 import { prepareCursor } from "./cursor/Prepare.ts";
+import { offerMcp } from "./McpOffer.ts";
 import { prepareKilo, prepareOpenCode } from "./opencode/Prepare.ts";
 
+/** `mcp`: the launch adds Impact's MCP servers that `impact mcp enable` turned on. */
 export const clients = {
-  antigravity: { label: "Antigravity", prepare: prepareAntigravity },
-  claude: { label: "Claude Code", prepare: prepareClaude },
-  codex: { label: "Codex CLI", prepare: prepareCodex },
-  cursor: { label: "Cursor Desktop", prepare: prepareCursor },
-  kilo: { label: "Kilo Code CLI", prepare: prepareKilo },
-  opencode: { label: "OpenCode", prepare: prepareOpenCode },
+  antigravity: { label: "Antigravity", prepare: prepareAntigravity, mcp: false },
+  claude: { label: "Claude Code", prepare: prepareClaude, mcp: true },
+  codex: { label: "Codex CLI", prepare: prepareCodex, mcp: true },
+  cursor: { label: "Cursor Desktop", prepare: prepareCursor, mcp: false },
+  kilo: { label: "Kilo Code CLI", prepare: prepareKilo, mcp: true },
+  opencode: { label: "OpenCode", prepare: prepareOpenCode, mcp: true },
 };
 export type Client = keyof typeof clients;
 export const CLIENTS = Object.keys(clients) as Client[];
@@ -50,9 +52,10 @@ const detached = (
 
 /** Runs the native client; without a connection (`--help`, `--version`) it starts unmodified. */
 export const launch = Effect.fn("launch")(function* (client: Client, args: readonly string[], connection?: Connection) {
-  const { label, prepare } = clients[client];
+  const { label, prepare, mcp } = clients[client];
   const executable = findExecutable(client);
   if (!executable) return yield* new CliError({ message: `Install ${label}, or set ${executableVariable(client)}.` });
+  if (connection && mcp) yield* offerMcp();
   const prepared = connection ? yield* prepare({ executable, args, connection }) : { args, env: process.env };
   const { IMPACT_LAUNCH_CWD: _, ...env }: NodeJS.ProcessEnv = prepared.env;
   if ("detach" in prepared) return yield* detached(label, executable, prepared.args, env, prepared.detach);

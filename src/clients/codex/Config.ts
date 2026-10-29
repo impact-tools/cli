@@ -20,6 +20,8 @@ export const configureCodex = Effect.fn("configureCodex")(function* (
   proxyUrl: string,
   directory = codexHome(),
   target: "profile" | "home" = "profile",
+  /** Impact's MCP servers at the proxy, merged over the user's own `mcp_servers`. */
+  mcpServers: Readonly<Record<string, { readonly url: string }>> = {},
 ) {
   const fs = yield* FileSystem.FileSystem;
   yield* fs.makeDirectory(directory, { recursive: true, mode: 0o700 });
@@ -54,6 +56,7 @@ export const configureCodex = Effect.fn("configureCodex")(function* (
     cli_auth_credentials_store: "file",
     sqlite_home: sqliteHome,
     features: { fast_mode: true, apps: false },
+    ...(Object.keys(mcpServers).length === 0 ? {} : { mcp_servers: mcpServers }),
   };
   const name = `impact-${randomUUID()}`;
   const merged = stringify(toMerged(existing, impact));

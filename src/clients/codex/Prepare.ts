@@ -8,6 +8,9 @@ import { clientEnvironment, type LaunchOptions } from "../Client.ts";
 import { impactCodexAuth } from "./Auth.ts";
 import { configureCodex } from "./Config.ts";
 import { requireProxy } from "../../proxy/Control.ts";
+import { enabledMcpServers } from "../../config/Mcp.ts";
+import { codexMcpServers } from "../../setup/Mcp.ts";
+import { DEFAULT_MODEL } from "../../setup/Models.ts";
 import { codexModels } from "./Models.ts";
 import { codexCaBundle } from "./Tls.ts";
 
@@ -25,7 +28,7 @@ export const prepareCodex = Effect.fn("prepareCodex")(function* ({ executable, a
   const catalog = yield* codexModels(connection, version);
   const requested = process.env.IMPACT_MODEL;
   const model =
-    catalog.models.find((model) => model.slug === (requested ?? "gpt-6.1-sol")) ??
+    catalog.models.find((model) => model.slug === (requested ?? DEFAULT_MODEL)) ??
     (requested ? undefined : catalog.models[0]);
   if (!model)
     return yield* new CliError({
@@ -34,7 +37,15 @@ export const prepareCodex = Effect.fn("prepareCodex")(function* ({ executable, a
   const account = yield* impactCodexAuth(yield* fetchUsage(connection));
   const certificateFile = yield* codexCaBundle(setup.codex.ca.toString());
   const appServer = args[0] === "app-server";
-  const profile = yield* configureCodex(model.slug, catalog, setup.codex.baseUrl, account.directory, appServer ? "home" : "profile");
+  const mcp = codexMcpServers(yield* enabledMcpServers, setup.codex.baseUrl);
+  const profile = yield* configureCodex(
+    model.slug,
+    catalog,
+    setup.codex.baseUrl,
+    account.directory,
+    appServer ? "home" : "profile",
+    mcp,
+  );
   // The stdio server has no --profile option; keep its secret proxy URL in its isolated config file.
   const clientArgs = appServer ? [] : ["--no-daemon", "--profile", profile.name];
   return {

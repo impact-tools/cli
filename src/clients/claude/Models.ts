@@ -5,6 +5,7 @@ import type { Connection } from "../../config/Connection.ts";
 import { getJson } from "../../api/Http.ts";
 import { CliError } from "../../Errors.ts";
 import { claudeAliases } from "../../schemas/ModelVocabulary.ts";
+import * as Setup from "../../setup/Claude.ts";
 
 const Catalog = Schema.Struct({
   data: Schema.Array(
@@ -45,14 +46,15 @@ export function selectedModel(models: readonly Model[], id: string | undefined):
   return models.find((model) => model.id === id) ?? named(lowered) ?? named(lowered.replace(/-\d{8}(?=\[1m\]$|$)/, ""));
 }
 
-/**
- * The compaction window a non-Claude model gets: its own context, within the 100k to 1M range
- * Claude Code accepts for `autoCompactWindow`. Claude models and smaller ones are left to Claude.
- */
-const ownWindow = (model: Model) =>
-  model.id.startsWith("claude-") || !model.max_input_tokens || model.max_input_tokens < 100_000
-    ? undefined
-    : Math.min(model.max_input_tokens, 1_000_000);
+/** A listed model in the setup generator's terms, which share the launch's windows and `/model` menu. */
+const setupModel = (model: Model) => ({
+  id: model.id,
+  name: model.display_name ?? model.id,
+  description: model.description,
+  contextTokens: model.max_input_tokens ?? 0,
+});
+
+const ownWindow = (model: Model) => Setup.compactWindow(setupModel(model));
 
 /** Compaction windows for non-Claude models that Claude Code does not know, unless the user chose a fitting one. */
 export function modelWindows(models: readonly Model[], settings: Record<string, unknown>) {
@@ -71,19 +73,9 @@ export function modelWindows(models: readonly Model[], settings: Record<string, 
   );
 }
 
-/**
- * `CLAUDE_CODE_MAX_CONTEXT_TOKENS`: the context Claude Code assumes for every model it doesn't know
- * (200k without it), one value for the whole session. A model picked later with `/model` gets it
- * too, so it is the largest window the launch may need: the selected model's, or any non-Claude
- * model's. Claude Code compacts within the smaller of it and a model's `autoCompactWindow`, so each
- * smaller model is still held to its own.
- */
-export function unknownModelContext(models: readonly Model[], selected: Model | undefined) {
-  const windows = [selected?.max_input_tokens, ...models.map(ownWindow)].filter(
-    (window): window is number => window !== undefined,
-  );
-  return windows.length === 0 ? undefined : Math.max(...windows);
-}
+/** `CLAUDE_CODE_MAX_CONTEXT_TOKENS` for the launch; see {@link Setup.unknownModelContext}. */
+export const unknownModelContext = (models: readonly Model[], selected: Model | undefined) =>
+  Setup.unknownModelContext(models.map(setupModel), selected && setupModel(selected));
 
 export const claudeModels = Effect.fn("claudeModels")(function* (connection: Connection) {
   const catalog = yield* getJson(connection, "/v1/models", Catalog, {
@@ -93,13 +85,6 @@ export const claudeModels = Effect.fn("claudeModels")(function* (connection: Con
   if (catalog.data.length === 0) return yield* new CliError({ message: "Impact has no enabled models." });
   return {
     models: catalog.data,
-    modelPicker: {
-      replaceBuiltInOptions: true,
-      options: catalog.data.map((model) => ({
-        model: model.id,
-        label: model.display_name ?? model.id,
-        description: model.description ?? model.display_name ?? "From Impact",
-      })),
-    },
+    modelPicker: Setup.claudeModelPicker(catalog.data.map(setupModel)),
   };
 });

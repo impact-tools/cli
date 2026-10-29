@@ -1,7 +1,9 @@
 import { Effect } from "effect";
 import { toMerged } from "es-toolkit";
 
+import { enabledMcpServers } from "../../config/Mcp.ts";
 import { helperCommand } from "../../process/Self.ts";
+import { claudeMcpConfig } from "../../setup/Mcp.ts";
 import { clientEnvironment, type LaunchOptions } from "../Client.ts";
 import { claudeConfig } from "./Config.ts";
 import { claudeModels, modelWindows, selectedModel, unknownModelContext } from "./Models.ts";
@@ -36,8 +38,17 @@ export const prepareClaude = Effect.fn("prepareClaude")(function* ({ args, conne
     statusLine: statusLine.settings,
   });
   const launchEnv: NodeJS.ProcessEnv = { ...env, ...gatewayEnv, IMPACT_CLAUDE_STATUS_FILE: statusLine.path };
+  const servers = yield* enabledMcpServers;
+  // Added beside the user's own servers; Claude asks the helper for the key's header when it connects.
+  const mcp =
+    servers.length === 0
+      ? []
+      : [
+          "--mcp-config",
+          JSON.stringify(claudeMcpConfig(servers, connection.baseUrl, helperCommand("mcp-headers"))),
+        ];
   return {
     env: launchEnv,
-    args: ["--settings", JSON.stringify(settings), ...config.args],
+    args: ["--settings", JSON.stringify(settings), ...mcp, ...config.args],
   };
 });
