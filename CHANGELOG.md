@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/impact-tools/cli/compare/v0.3.2...v0.4.0) (2026-10-29)
+
+
+### Features
+
+* **mcp:** integrate MCP server management into CLI commands and client configurations ([fa1d6f9](https://github.com/impact-tools/cli/commit/fa1d6f91f0784123121e7b71662405b7033ca1e5))
+
 ## [0.3.2](https://github.com/impact-tools/cli/compare/v0.3.1...v0.3.2) (2026-10-27)
 
 
