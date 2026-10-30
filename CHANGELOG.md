@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/impact-tools/cli/compare/v0.4.0...v0.5.0) (2026-10-30)
+
+
+### Features
+
+* **cursor:** write commit messages on a cheap model ([8483efc](https://github.com/impact-tools/cli/commit/8483efc93bb6181b526f02fb98da8dd084ce98d7))
+
 ## [0.4.0](https://github.com/impact-tools/cli/compare/v0.3.2...v0.4.0) (2026-10-29)
 
 
