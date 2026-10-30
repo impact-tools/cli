@@ -210,3 +210,16 @@ it("includes every Impact model in named picker sections over protobuf", async (
       .map((model: { name: string }) => model.name)).toEqual(catalog.modelNames);
   } finally { await fixture.close(); }
 });
+
+it("writes commit messages on the cheapest preferred model", async () => {
+  const fixture = await setupNative({ data: [...modelsPayload.data, { id: "claude-haiku-5-5", display_name: "Haiku", context_length: 64000, capabilities: [] }] });
+  try {
+    const body = fixture.wire.encode("aiserver.v1.WriteGitCommitMessageRequest", { diffs: ["+added line"], previousCommitMessages: ["fix: older"] });
+    const response = await fixture.call("/aiserver.v1.AiService/WriteGitCommitMessage", Buffer.from(body), "application/proto");
+    expect(response.status).toBe(200);
+    expect(fixture.wire.decode("aiserver.v1.WriteGitCommitMessageResponse", Buffer.from(await response.arrayBuffer())).commitMessage).toBe("Impact answer");
+    const generation = fixture.requests.find((request) => request.path === "/v1/chat/completions")!;
+    expect(JSON.parse(generation.body.toString())).toMatchObject({ model: "claude-haiku-5-5" });
+    expect(generation.body.toString()).toContain("+added line");
+  } finally { await fixture.close(); }
+});

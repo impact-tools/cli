@@ -14,6 +14,9 @@ import { CursorWire, decodeFrames, endFrame, frame } from "./Wire.ts";
 type Request = IncomingMessage | Http2ServerRequest;
 type Response = ServerResponse | Http2ServerResponse;
 const MAX_BODY = 4 * 1024 * 1024;
+// Commit messages are short, so they run on the cheapest capable model the account has.
+const COMMIT_MODELS = ["claude-haiku-5-5", "gemini-3.8-flash"];
+const MAX_COMMIT_DIFF = 60_000;
 const publicRpc = new Set(["/aiserver.v1.ServerConfigService/GetServerConfig", "/aiserver.v1.AiService/ServerTime", "/aiserver.v1.AiService/HealthCheck", "/aiserver.v1.AnalyticsService/Batch", "/aiserver.v1.AnalyticsService/BootstrapStatsig"]);
 const housekeeping = new Set([
   "/aiserver.v1.AnalyticsService/Batch", "/aiserver.v1.AnalyticsService/BootstrapStatsig",
@@ -173,6 +176,20 @@ export function createCursorNative(connection: Connection, account: CursorAccoun
       case "/aiserver.v1.AiService/ServerTime": value = { receiveTimestamp: Date.now() / 1000, transmitTimestamp: Date.now() / 1000 }; break;
       case "/aiserver.v1.AiService/HealthCheck": value = {}; break;
       default: if (housekeeping.has(path)) value = {};
+    }
+    if (path === "/aiserver.v1.AiService/WriteGitCommitMessage") {
+      const model = COMMIT_MODELS.find((id) => modelIds.includes(id)) ?? modelIds[0]!;
+      const diffs = (input.diffs ?? []).join("\n").slice(0, MAX_COMMIT_DIFF);
+      const previous = (input.previousCommitMessages ?? []).slice(0, 10).join("\n---\n");
+      if (!diffs.trim()) throw new ProtocolError("invalid_argument", "Cursor request contains no diff.");
+      const messages: ChatMessage[] = [
+        { role: "system", content: "Write one git commit message for the diff. Match the style of the previous commit messages. Output only the message, with no quotes or code fences." },
+        { role: "user", content: `${previous ? `Previous commit messages:\n${previous}\n\n` : ""}Diff:\n${diffs}` },
+      ];
+      let text = "";
+      for await (const delta of streamChat(connection, { model, messages }, signal)) text += delta.content ?? "";
+      unary(request, response, method.output, { commitMessage: text.trim().replace(/^```\w*\n?|\n?```$/g, "").trim() });
+      return;
     }
     if (value) { unary(request, response, method.output, value); return; }
     if (/\/(?:StreamChat|StreamChatWeb|StreamUnifiedChat|StreamComposer|StreamCmdK|StreamTerminalCmdK)$/.test(path) && method.kind === "server") {

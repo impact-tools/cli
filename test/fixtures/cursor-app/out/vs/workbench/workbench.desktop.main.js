@@ -11,6 +11,8 @@ ModelDetails=A.makeMessageType("fixture.ModelDetails",()=>[{no:1,name:"model_nam
 Message=A.makeMessageType("fixture.Message",()=>[{no:1,name:"type",kind:"scalar",T:5},{no:2,name:"text",kind:"scalar",T:9}]),
 Chat=A.makeMessageType("fixture.Chat",()=>[{no:1,name:"model_details",kind:"message",T:ModelDetails},{no:2,name:"conversation",kind:"message",T:Message,repeated:!0},{no:3,name:"is_agentic",kind:"scalar",T:8}]),
 ChatOutput=A.makeMessageType("fixture.ChatOutput",()=>[{no:1,name:"text",kind:"scalar",T:9}]),
-ai={typeName:"aiserver.v1.AiService",methods:{models:{name:"AvailableModels",I:Empty,O:Models,kind:K.Unary},cpp:{name:"CppConfig",I:Empty,O:Cpp,kind:K.Unary},chat:{name:"StreamChat",I:Chat,O:ChatOutput,kind:K.ServerStreaming},unsupported:{name:"Unsupported",I:Empty,O:Empty,kind:K.Unary}}};
+CommitReq=A.makeMessageType("aiserver.v1.WriteGitCommitMessageRequest",()=>[{no:1,name:"diffs",kind:"scalar",T:9,repeated:!0},{no:2,name:"previous_commit_messages",kind:"scalar",T:9,repeated:!0}]),
+CommitRes=A.makeMessageType("aiserver.v1.WriteGitCommitMessageResponse",()=>[{no:1,name:"commit_message",kind:"scalar",T:9}]),
+ai={typeName:"aiserver.v1.AiService",methods:{models:{name:"AvailableModels",I:Empty,O:Models,kind:K.Unary},cpp:{name:"CppConfig",I:Empty,O:Cpp,kind:K.Unary},chat:{name:"StreamChat",I:Chat,O:ChatOutput,kind:K.ServerStreaming},commit:{name:"WriteGitCommitMessage",I:CommitReq,O:CommitRes,kind:K.Unary},unsupported:{name:"Unsupported",I:Empty,O:Empty,kind:K.Unary}}};
 auth={typeName:"aiserver.v1.AuthService",methods:{email:{name:"GetEmail",I:Empty,O:Email,kind:K.Unary}}};
 fs={typeName:"aiserver.v1.FileSyncService",methods:{enabled:{name:"FSIsEnabledForUser",I:Empty,O:FileSync,kind:K.Unary}}};
