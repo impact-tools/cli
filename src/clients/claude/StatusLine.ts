@@ -6,7 +6,7 @@ import { join } from "node:path";
 import type { Connection } from "../../config/Connection.ts";
 import type { StatusLine } from "./Config.ts";
 
-import { fetchUsage, usageSummary } from "../../api/Usage.ts";
+import { accountSummary, fetchUsage } from "../../api/Usage.ts";
 import { mapPlatformError } from "../../Errors.ts";
 import { helperCommand } from "../../process/Self.ts";
 
@@ -22,7 +22,7 @@ export const prepareStatusLine = Effect.fn("prepareStatusLine")(function* (
   const path = join(directory, "status.json");
   const temporary = join(directory, "status.tmp");
   const refresh = fetchUsage(connection, "2 seconds").pipe(
-    Effect.map((usage) => usageSummary(connection, usage)),
+    Effect.map((usage) => accountSummary(connection, usage)),
     Effect.orElseSucceed(() => `Impact · ${connection.baseUrl} · balance unavailable`),
     Effect.flatMap((line) =>
       fs.writeFileString(temporary, JSON.stringify({ line, command: existing?.command }), { mode: 0o600 }),

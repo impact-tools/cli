@@ -13,16 +13,26 @@ import { version } from "../package.json";
 import * as Http from "../src/api/Http.ts";
 import { createDeviceClient, waitForDeviceToken } from "../src/auth/Device.ts";
 import { command } from "../src/Command.ts";
-import {
-  ApiKey,
-  CreatedApiKey,
-  DEFAULT_FUNDING,
-  DEFAULT_KEY_ROUTING,
-  DEFAULT_KEY_TOOLS,
-} from "../src/schemas/Billing.ts";
+import { ApiKey, CreatedApiKey, DEFAULT_FUNDING, type KeyRouting, type KeyTools } from "../src/schemas/Billing.ts";
+import { DEFAULT_SEARCH_EFFORT, SEARCH_MODEL_ID } from "../src/schemas/ModelVocabulary.ts";
 import { makeOutput, Output } from "../src/ui/Output.ts";
 import { isolatedEnvironment } from "./support/Environment.ts";
 import { catalog } from "./support/Impact.ts";
+
+/** A new key's tools and routing as the server answers them: the defaults are the server's, not public. */
+const KEY_TOOLS: KeyTools = {
+  webSearch: true,
+  searchModel: SEARCH_MODEL_ID,
+  searchEffort: DEFAULT_SEARCH_EFFORT,
+  streamLive: false,
+  replaceNativeSearch: false,
+  vision: true,
+};
+const KEY_ROUTING: KeyRouting = {
+  enabled: false,
+  targets: ["gpt-6.1-sol", "gpt-5.6-sol", "gpt-5.6-luna"],
+  ceiling: "max",
+};
 
 const servers: ReturnType<typeof createServer>[] = [];
 afterEach(async () => {
@@ -169,8 +179,8 @@ async function impactServer(options: ImpactOptions = {}) {
                 canCopy: true,
                 monthlyLimitMicros: null,
                 funding: [...DEFAULT_FUNDING],
-                tools: DEFAULT_KEY_TOOLS,
-                routing: DEFAULT_KEY_ROUTING,
+                tools: KEY_TOOLS,
+                routing: KEY_ROUTING,
                 createdAt: 0,
                 lastUsedAt: null,
                 requests30d: 0,

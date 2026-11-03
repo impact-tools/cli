@@ -6,12 +6,15 @@ import { pathToFileURL } from "node:url";
 import { ImpactRpcs } from "../src/schemas/Rpcs.ts";
 
 /**
- * `src/schemas` copies the gateway's shared contract so the CLI builds on its own. Inside the
- * monorepo the copies must match their sources byte for byte; a standalone checkout has no
- * sources to compare with and skips this.
+ * `src/schemas` copies the gateway's public contract so the CLI builds on its own. Inside the
+ * monorepo the copies must match their sources in `packages/public-schemas` byte for byte (the files
+ * of `packages/schemas` only re-export them); a standalone checkout has no sources to compare with
+ * and skips this.
  */
 const copies = join(import.meta.dirname, "../src/schemas");
-const sources = join(import.meta.dirname, "../../packages/schemas/src");
+const sources = join(import.meta.dirname, "../../packages/public-schemas/src");
+/** The server's own schemas, where the whole RPC group lives: it is not part of the public contract. */
+const serverSchemas = join(import.meta.dirname, "../../packages/schemas/src");
 /** The CLI's RPC group is a deliberate subset: only the calls it makes. */
 const SUBSET = "Rpcs.ts";
 
@@ -27,7 +30,7 @@ describe("model data", () => {
   });
 });
 
-describe.skipIf(!existsSync(sources))("copied API contract", () => {
+describe.skipIf(!existsSync(sources) || !existsSync(serverSchemas))("copied API contract", () => {
   const copied = files(copies)
     .map((path) => relative(copies, path))
     .filter((path) => path !== SUBSET);
@@ -37,16 +40,16 @@ describe.skipIf(!existsSync(sources))("copied API contract", () => {
     for (const path of ["V1.ts", "Spend.ts", "Billing.ts", "ModelVocabulary.ts"]) assert.include(copied, path);
   });
 
-  it.each(copied)("%s matches packages/schemas byte for byte", (path) => {
-    assert.isTrue(existsSync(join(sources, path)), `${path} has no source in packages/schemas/src`);
+  it.each(copied)("%s matches packages/public-schemas byte for byte", (path) => {
+    assert.isTrue(existsSync(join(sources, path)), `${path} has no source in packages/public-schemas/src`);
     assert.isTrue(
       readFileSync(join(copies, path)).equals(readFileSync(join(sources, path))),
-      `cli/src/schemas/${path} differs from packages/schemas/src/${path}; copy the source over`,
+      `cli/src/schemas/${path} differs from packages/public-schemas/src/${path}; copy the source over`,
     );
   });
 
   it("keeps only RPCs the server defines, built from the copied groups", async () => {
-    const server = (await import(pathToFileURL(join(sources, SUBSET)).href)) as {
+    const server = (await import(pathToFileURL(join(serverSchemas, SUBSET)).href)) as {
       readonly ImpactRpcs: { readonly requests: ReadonlyMap<string, unknown> };
     };
     const served = [...server.ImpactRpcs.requests.keys()];

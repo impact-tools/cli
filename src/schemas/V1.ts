@@ -11,7 +11,8 @@ const Count = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
 // ---------------------------------------------------------------------------------------------
 // GET /v1/usage and /api/codex/usage
 
-const UsageAccount = Schema.Struct({ id: Schema.String, email: Schema.String });
+/** `name` is the account's display name; servers before it sent only the id and e-mail. */
+const UsageAccount = Schema.Struct({ id: Schema.String, email: Schema.String, name: Schema.optional(Schema.String) });
 
 /** Amounts are decimal USD strings. `balance` is what is available now: `total` minus `reserved`. */
 const UsageCredits = Schema.Struct({
@@ -31,11 +32,26 @@ const UsageWindow = Schema.Struct({
 });
 
 /** The wallet in the shape Codex reads a ChatGPT plan's usage. */
+/**
+ * The plan credits of the paid period running now, in dollars as decimal strings like `credits`:
+ * what the period was granted, has spent and holds for requests in flight, what is left, and when it
+ * ends (Unix seconds). Unspent credits end with the period.
+ */
+export const UsagePlanCredits = Schema.Struct({
+  granted: Schema.String,
+  spent: Schema.String,
+  held: Schema.String,
+  remaining: Schema.String,
+  ends_at: Schema.Finite,
+});
+
 export const V1Usage = Schema.Struct({
   currency: Schema.Literal("USD"),
   account: UsageAccount,
   plan_type: Schema.String,
   credits: UsageCredits,
+  /** Null on Free; absent from servers before plan credits. */
+  plan_credits: Schema.optional(Schema.NullOr(UsagePlanCredits)),
   rate_limit: Schema.Struct({
     allowed: Schema.Boolean,
     limit_reached: Schema.Boolean,

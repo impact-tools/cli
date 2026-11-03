@@ -2,7 +2,7 @@ import { assert, describe, it } from "@effect/vitest";
 import { Effect } from "effect";
 
 import { countModels } from "../src/api/Models.ts";
-import { fetchUsage, usageSummary, walletBalance } from "../src/api/Usage.ts";
+import { accountSummary, fetchUsage, planCreditsLeft, usageSummary, walletBalance } from "../src/api/Usage.ts";
 import { codexModels } from "../src/clients/codex/Models.ts";
 import { connection, impactHttp, key, usage } from "./support/Impact.ts";
 
@@ -17,6 +17,34 @@ describe("Impact API", () => {
     assert.strictEqual(walletBalance(wallet), expected);
     assert.strictEqual(usageSummary(connection, wallet), `Impact · ada@example.com · $${expected} USD`);
   });
+
+  it("says what is left of the plan credits of a paid period, and nothing on Free or from an older server", () => {
+    const wallet = { ...usage, currency: "USD" as const };
+    const plan_credits = { granted: "45", spent: "0", held: "0", remaining: "44.99", ends_at: 1_795_953_600 };
+    assert.strictEqual(planCreditsLeft({ ...wallet, plan_credits }), "$44.99 USD left of $45 USD · until Nov 29");
+    assert.strictEqual(
+      accountSummary(connection, { ...wallet, plan_credits }),
+      "Impact · ada@example.com · $14.845 USD · Plan credits $44.99 USD left",
+    );
+    for (const free of [{ ...wallet, plan_credits: null }, wallet]) {
+      assert.isUndefined(planCreditsLeft(free));
+      assert.strictEqual(accountSummary(connection, free), usageSummary(connection, free));
+    }
+  });
+
+  it.effect("decodes the plan credits of /v1/usage, and a response without them", () =>
+    Effect.gen(function* () {
+      const plan_credits = { granted: "15", spent: "2.5", held: "0.2", remaining: "12.3", ends_at: 1_795_953_600 };
+      const paid = yield* fetchUsage(connection).pipe(
+        Effect.provide(impactHttp(() => Response.json({ ...usage, plan_credits }))),
+      );
+      assert.deepStrictEqual(paid.plan_credits, plan_credits);
+      const free = yield* fetchUsage(connection).pipe(
+        Effect.provide(impactHttp(() => Response.json({ ...usage, plan_credits: null }))),
+      );
+      assert.isNull(free.plan_credits);
+    }),
+  );
 
   it.effect("sends the key as a bearer token and decodes the response", () =>
     Effect.gen(function* () {

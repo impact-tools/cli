@@ -2,15 +2,21 @@ import { Schema } from "effect";
 import { Rpc } from "effect/rpc";
 
 import { Forbidden, NotFound } from "./Errors.ts";
-import { DEFAULT_SEARCH_EFFORT, SEARCH_EFFORTS, SEARCH_MODEL_ID } from "./ModelVocabulary.ts";
+import { SEARCH_EFFORTS } from "./ModelVocabulary.ts";
 
 /** Instants are Unix ms; money is micro-USD integers throughout. */
 const Instant = Schema.Finite;
 const Micros = Schema.Int;
 
-/** What can pay for a request: your own accounts, the plan's included usage, or credits. */
+/** What can pay for a request: your own accounts, the plan's credits, or the balance. */
 export const FundingSource = Schema.Literals(["byok", "subscription", "balance"]);
 export type FundingSource = typeof FundingSource.Type;
+
+/** Who pays a request Impact serves: the plan's credits (`subscription`) or the balance. */
+export type Pot = Exclude<FundingSource, "byok">;
+
+/** Whether Impact serves and charges the source's requests, as against the user's own accounts. */
+export const impactPaid = (source: FundingSource): source is Pot => source !== "byok";
 
 /** One step of a key's billing order; disabled steps keep their place. */
 export const FundingStep = Schema.Struct({ source: FundingSource, enabled: Schema.Boolean });
@@ -22,11 +28,50 @@ export const DEFAULT_FUNDING: readonly FundingStep[] = [
   { source: "balance", enabled: true },
 ];
 
+/** The pots a key's enabled steps pay from, in its billing order. */
+export const paidPots = (funding: readonly FundingStep[]): Pot[] =>
+  funding.flatMap((step) => (step.enabled && impactPaid(step.source) ? [step.source] : []));
+
+/**
+ * Whether what is left of plan credits too small for a request spills to the balance: only when the
+ * key's balance step comes after its plan-credits step and is on.
+ */
+export const spillsToBalance = (funding: readonly FundingStep[]): boolean => {
+  const credits = funding.findIndex((step) => step.source === "subscription");
+  const balance = funding.findIndex((step) => step.source === "balance");
+  return credits >= 0 && balance > credits && funding[balance]!.enabled;
+};
+
+/**
+ * The pots Impact may pay a request from when the key's billing order reaches `source`: the run of
+ * enabled plan-credits and balance steps it starts or is in, in the key's order; none for the user's
+ * own accounts. Two such steps next to each other are one walk of the operator's pool.
+ */
+export const groupPots = (funding: readonly FundingStep[], source: FundingSource): Pot[] => {
+  if (!impactPaid(source)) return [];
+  const enabled = funding.filter((step) => step.enabled);
+  const at = enabled.findIndex((step) => step.source === source);
+  if (at < 0) return [source];
+  let start = at;
+  while (start > 0 && impactPaid(enabled[start - 1]!.source)) start -= 1;
+  const pots: Pot[] = [];
+  for (let index = start; index < enabled.length; index += 1) {
+    const candidate = enabled[index]!.source;
+    if (!impactPaid(candidate)) break;
+    pots.push(candidate);
+  }
+  return pots;
+};
+
+/** Whether the key still pays the way `source` does: an enabled step of the same kind, Impact's or the user's own. */
+export const fundingGroupActive = (funding: readonly FundingStep[], source: FundingSource): boolean =>
+  funding.some((step) => step.enabled && impactPaid(step.source) === impactPaid(source));
+
 /** The calls the gateway makes on a model's behalf, set per key. */
 export const KeyTools = Schema.Struct({
   /** Models without hosted search get a `web_search` tool the gateway answers. */
   webSearch: Schema.Boolean,
-  /** The Gemini model that answers those searches; they are priced at its tariff. */
+  /** The Gemini model that answers those searches; they are charged at its prices on Models. */
   searchModel: Schema.String,
   /** How hard the search model thinks; one of the model's `searchEfforts`. */
   searchEffort: Schema.Literals(SEARCH_EFFORTS),
@@ -42,34 +87,19 @@ export const KeyTools = Schema.Struct({
 });
 export type KeyTools = typeof KeyTools.Type;
 
-export const DEFAULT_KEY_TOOLS: KeyTools = {
-  webSearch: true,
-  searchModel: SEARCH_MODEL_ID,
-  searchEffort: DEFAULT_SEARCH_EFFORT,
-  streamLive: false,
-  replaceNativeSearch: false,
-  vision: true,
-};
-
 /** How far smart routing may push reasoning: a cap on the effort it picks from a target's ladder. */
 const ROUTING_CEILINGS = ["low", "medium", "high", "max"] as const;
 export type RoutingCeiling = (typeof ROUTING_CEILINGS)[number];
 
-/** Smart routing for one key. Saved with the key; the gateway doesn't serve `jev-auto` yet. */
+/** Smart routing for one key, saved with it. */
 export const KeyRouting = Schema.Struct({
-  /** Opt-in: while off, `jev-auto` is not offered to this key. */
+  /** Opt-in: while off, the key is not offered smart routing. */
   enabled: Schema.Boolean,
   /** The complete allowlist of catalog model ids, in order. The first one is the fail-open target. */
   targets: Schema.Array(Schema.String),
   ceiling: Schema.Literals(ROUTING_CEILINGS),
 });
 export type KeyRouting = typeof KeyRouting.Type;
-
-export const DEFAULT_KEY_ROUTING: KeyRouting = {
-  enabled: false,
-  targets: ["gpt-6.1-sol", "gpt-5.6-sol", "gpt-5.6-luna"],
-  ceiling: "max",
-};
 
 /** Every key starts `sk-imp-`; the rest is random. */
 export const API_KEY_PREFIX = "sk-imp-";

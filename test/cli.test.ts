@@ -235,6 +235,35 @@ describe("impact", () => {
     if (!("reserved" in credits)) expect(result.stdout).not.toContain("Held:");
   });
 
+  it("shows the plan credits of the running period on a paid plan, in status and on the landing", async () => {
+    const plan_credits = { granted: "15", spent: "2.5", held: "0.2", remaining: "12.3", ends_at: 1_795_953_600 };
+    server.removeAllListeners("request");
+    server.on("request", (request, response) => {
+      const path = new URL(request.url ?? "/", "http://x").pathname;
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(JSON.stringify(path === "/v1/usage" ? { ...impactBody(path), plan_credits } : impactBody(path)));
+    });
+    const status = await impact(["status"]);
+    expect(status.stdout).toContain(
+      "Available: $12.345 USD\nPlan credits: $12.3 USD left of $15 USD · until Nov 29\nEndpoint:",
+    );
+    const landing = await impact([]);
+    expect(landing.stdout).toContain("Impact · ada@example.com · $14.845 USD · Plan credits $12.3 USD left");
+  });
+
+  it.each([null, undefined])("shows no plan credits on Free or from an older server: %j", async (plan_credits) => {
+    server.removeAllListeners("request");
+    server.on("request", (request, response) => {
+      const path = new URL(request.url ?? "/", "http://x").pathname;
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(JSON.stringify(path === "/v1/usage" ? { ...impactBody(path), plan_credits } : impactBody(path)));
+    });
+    const status = await impact(["status"]);
+    expect(status.stdout).toContain("Available: $12.345 USD\nEndpoint:");
+    expect(status.stdout).not.toContain("Plan credits");
+    expect((await impact([])).stdout).not.toContain("Plan credits");
+  });
+
   it.each([
     ["status", "--claude"],
     ["helper", "status-line"],
