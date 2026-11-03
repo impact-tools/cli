@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/impact-tools/cli/compare/v0.5.0...v0.6.0) (2026-11-03)
+
+
+### Features
+
+* **status:** show the plan credits left in impact status and the status line ([bc786ae](https://github.com/impact-tools/cli/commit/bc786ae18776233dff3bb9dc6b127663288a0f07))
+
 ## [0.5.0](https://github.com/impact-tools/cli/compare/v0.4.0...v0.5.0) (2026-10-30)
 
 
