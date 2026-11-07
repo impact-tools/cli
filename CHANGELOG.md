@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.7.0](https://github.com/impact-tools/cli/compare/v0.6.0...v0.7.0) (2026-11-07)
+
+
+### Features
+
+* **claude:** send Claude Code's request hints; take preset ids ([f96f910](https://github.com/impact-tools/cli/commit/f96f910fbfd6d0a3499526f80acc2ee44e8d6a20))
+* **logs:** know the image, video, embedding and Gemini endpoints ([a7666ab](https://github.com/impact-tools/cli/commit/a7666ab96f2149cbabc588666f7f1cb63ef83875))
+* **mcp:** X Search and Deep Research in `impact mcp` ([7b593ac](https://github.com/impact-tools/cli/commit/7b593ac0f422c433cce9c2202e714f4d809052be))
+* **proxy:** forward the image, video, embedding and Gemini APIs ([5153a85](https://github.com/impact-tools/cli/commit/5153a85a7b98687328904cd2f31dac84870e0dbc))
+
 ## [0.6.0](https://github.com/impact-tools/cli/compare/v0.5.0...v0.6.0) (2026-11-03)
 
 
