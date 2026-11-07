@@ -2,7 +2,7 @@ import { Effect, Stdio } from "effect";
 import { Prompt } from "effect/cli";
 
 import { readMcpSettings, saveMcpSettings } from "../config/Mcp.ts";
-import { MCP_DOCS_URL, MCP_SERVER_IDS, MCP_SERVERS } from "../setup/Mcp.ts";
+import { MCP_DOCS_URL, MCP_SERVER_IDS, mcpEnable, mcpLabels } from "../setup/Mcp.ts";
 import { Output } from "../ui/Output.ts";
 
 type Answer = "enable" | "later" | "never";
@@ -20,7 +20,7 @@ export const offerMcp = Effect.fnUntraced(function* () {
     (server) => !saved.enabled.includes(server) && !saved.dismissed.includes(server),
   );
   if (offered.length === 0) return;
-  const names = offered.map((server) => MCP_SERVERS[server].label).join(" and ");
+  const names = mcpLabels(offered);
   const answer = yield* Prompt.Select<Answer>({
     message: `Add ${names} to your sessions? ${MCP_DOCS_URL}`,
     choices: [
@@ -33,7 +33,7 @@ export const offerMcp = Effect.fnUntraced(function* () {
   const output = yield* Output;
   if (answer === "never") {
     yield* saveMcpSettings({ ...saved, dismissed: [...saved.dismissed, ...offered] });
-    return yield* output.line("Turn them on any time with impact mcp enable context7 firecrawl.");
+    return yield* output.line(`Turn ${offered.length === 1 ? "it" : "them"} on any time with ${mcpEnable(offered)}.`);
   }
   yield* saveMcpSettings({ ...saved, enabled: [...saved.enabled, ...offered] });
   yield* output.notice("success", `${names} on. Turn off with impact mcp disable.`);

@@ -10,7 +10,16 @@ import { prepareClaude } from "../src/clients/claude/Prepare.ts";
 import { route } from "../src/clients/codex/Proxy.ts";
 import { prepareOpenCode } from "../src/clients/opencode/Prepare.ts";
 import { enabledMcpServers, readMcpSettings, setMcpServers } from "../src/config/Mcp.ts";
-import { claudeMcpConfig, codexMcpServers, mcpSteps, MCP_TOOLS } from "../src/setup/Mcp.ts";
+import {
+  claudeMcpConfig,
+  codexMcpServers,
+  MCP_SERVER_CHOICE,
+  MCP_SERVER_IDS,
+  mcpEnable,
+  mcpLabels,
+  mcpSteps,
+  MCP_TOOLS,
+} from "../src/setup/Mcp.ts";
 import { isolatedEnvironment } from "./support/Environment.ts";
 import { connection, impactHttp, key } from "./support/Impact.ts";
 
@@ -96,10 +105,10 @@ describe("MCP in launches", () => {
   });
 
   it("builds Claude's config for several servers at one origin", () => {
-    assert.deepStrictEqual(Object.keys(claudeMcpConfig(["context7", "firecrawl"], "https://x", "h").mcpServers), [
-      "context7",
-      "firecrawl",
-    ]);
+    assert.deepStrictEqual(
+      Object.keys(claudeMcpConfig(["context7", "firecrawl", "x-search"], "https://x", "h").mcpServers),
+      ["context7", "firecrawl", "x-search"],
+    );
   });
 });
 
@@ -107,20 +116,25 @@ describe("manual MCP setup", () => {
   it.each(MCP_TOOLS)("%s gets steps that name every server and parse", (tool) => {
     const steps = mcpSteps(tool, ["context7", "firecrawl"], { models: [], apiKey: key, platform: "unix" });
     const text = JSON.stringify(steps);
-    for (const path of ["/mcp/context7", "/mcp/firecrawl"]) assert.include(text, path);
+    for (const path of ["/mcp/context7", "/mcp/firecrawl", "/mcp/x-search", "/mcp/research"])
+      assert.include(text, path);
     for (const step of steps) if (step.kind === "code" && step.language === "json") JSON.parse(step.code);
   });
 });
 
 describe("impact mcp", () => {
   it("turns servers on, lists them and refuses an unknown one", async () => {
-    await impact(["mcp", "enable", "context7"]);
+    const enabled = await impact(["mcp", "enable", "context7", "x-search"]);
+    assert.include(enabled.stdout, "Context7 and X Search on:");
+    assert.include(enabled.stdout, "add them from the next launch");
     const listed = await impact(["mcp", "list"]);
     assert.include(listed.stdout, "context7: on");
     assert.include(listed.stdout, "firecrawl: off");
+    assert.include(listed.stdout, "x-search: on");
     const error = await impact(["mcp", "enable", "nope"]).catch((failure: { stderr: string }) => failure);
     assert.include("stderr" in error ? error.stderr : "", "Unknown MCP server nope");
     await impact(["mcp", "disable", "context7"]);
     assert.include((await impact(["mcp", "list"])).stdout, "context7: off");
+    assert.include((await impact(["mcp", "enable", "firecrawl"])).stdout, "add it from the next launch");
   });
 });

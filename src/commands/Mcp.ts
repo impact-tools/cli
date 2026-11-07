@@ -3,7 +3,17 @@ import { Argument, Command } from "effect/cli";
 
 import { mcpFile, readMcpSettings, setMcpServers } from "../config/Mcp.ts";
 import { CliError } from "../Errors.ts";
-import { isMcpServer, MCP_DOCS_URL, MCP_SERVER_IDS, MCP_SERVERS, mcpUrl, type McpServer } from "../setup/Mcp.ts";
+import {
+  isMcpServer,
+  MCP_DOCS_URL,
+  MCP_SERVER_CHOICE,
+  MCP_SERVER_IDS,
+  MCP_SERVERS,
+  mcpEnable,
+  mcpLabels,
+  mcpUrl,
+  type McpServer,
+} from "../setup/Mcp.ts";
 import { Output } from "../ui/Output.ts";
 
 /** The launches that add the enabled servers; Cursor and Antigravity keep their own MCP settings. */
@@ -11,16 +21,14 @@ const LAUNCHES = "impact claude, impact codex, impact opencode and impact kilo";
 
 const names = Argument.String("server").pipe(
   Argument.variadic({ min: 1 }),
-  Argument.withDescription(`${MCP_SERVER_IDS.join(" or ")}`),
+  Argument.withDescription(MCP_SERVER_CHOICE),
 );
 
 const parseServers = (values: readonly string[]) =>
   Effect.gen(function* () {
     const unknown = values.filter((value) => !isMcpServer(value));
     if (unknown.length > 0)
-      return yield* new CliError({
-        message: `Unknown MCP server ${unknown.join(", ")}. Choose ${MCP_SERVER_IDS.join(" or ")}.`,
-      });
+      return yield* new CliError({ message: `Unknown MCP server ${unknown.join(", ")}. Choose ${MCP_SERVER_CHOICE}.` });
     return values as McpServer[];
   });
 
@@ -42,7 +50,7 @@ const enable = Command.make(
     yield* setMcpServers(chosen, true);
     yield* output.notice(
       "success",
-      `${chosen.map((server) => MCP_SERVERS[server].label).join(" and ")} on: ${LAUNCHES} add it from the next launch.`,
+      `${mcpLabels(chosen)} on: ${LAUNCHES} add ${chosen.length === 1 ? "it" : "them"} from the next launch.`,
     );
   }),
 ).pipe(Command.withDescription("Add Impact's MCP servers to every launch"));
@@ -54,13 +62,13 @@ const disable = Command.make(
     const output = yield* Output;
     const chosen = yield* parseServers(servers);
     yield* setMcpServers(chosen, false);
-    yield* output.notice("success", `${chosen.map((server) => MCP_SERVERS[server].label).join(" and ")} off.`);
+    yield* output.notice("success", `${mcpLabels(chosen)} off.`);
   }),
 ).pipe(Command.withDescription("Stop adding Impact's MCP servers to launches"));
 
 const list = Command.make("list", {}, showServers).pipe(Command.withDescription("Show which MCP servers launches add"));
 
-/** `impact mcp`: Impact's MCP servers (Context7, Firecrawl) in launches, paid like any request on the login's key. */
+/** `impact mcp`: Impact's MCP servers in launches, paid like any request on the login's key. */
 export const mcp = Command.make(
   "mcp",
   {},
@@ -70,7 +78,7 @@ export const mcp = Command.make(
     yield* showServers();
     yield* output.line("");
     yield* output.rows([
-      ["Turn on", "impact mcp enable context7 firecrawl"],
+      ["Turn on", mcpEnable(MCP_SERVER_IDS)],
       ["Turn off", "impact mcp disable firecrawl"],
       ["Settings", mcpFile()],
       ["Docs", MCP_DOCS_URL],
@@ -79,6 +87,6 @@ export const mcp = Command.make(
   }),
 ).pipe(
   Command.withSubcommands([enable, disable, list]),
-  Command.withDescription("Context7 and Firecrawl in impact claude, codex, opencode and kilo"),
-  Command.withShortDescription("Context7 and Firecrawl MCP servers"),
+  Command.withDescription(`${mcpLabels(MCP_SERVER_IDS)} in impact claude, codex, opencode and kilo`),
+  Command.withShortDescription(`${mcpLabels(MCP_SERVER_IDS)} MCP servers`),
 );
