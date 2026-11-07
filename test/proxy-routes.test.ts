@@ -64,7 +64,8 @@ const serverRoutes = () => {
 
 const closedBy = (closed: Readonly<Record<string, string>>, path: string) =>
   Object.keys(closed).find((entry) => (entry.endsWith("/*") ? path.startsWith(entry.slice(0, -1)) : entry === path));
-const sample = (path: string) => path.replace(/:\w+/g, "gpt-6.1-sol");
+/** A route's path as a client sends it: each parameter segment filled in, a literal `:action` after one kept. */
+const sample = (path: string) => path.replace(/\/:\w+/g, "/gpt-6.1-sol");
 
 /** Paths the Cursor proxy and `impact proxy` keep away from Impact's API. */
 const CLOSED_API_ROUTES: Readonly<Record<string, string>> = {
