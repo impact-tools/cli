@@ -101,6 +101,8 @@ describe("MCP in launches", () => {
       context7: { url: "https://127.0.0.1:1/p/mcp/context7" },
     });
     assert.deepStrictEqual(route("/p/mcp/firecrawl", "/p"), { forward: "/mcp/firecrawl" });
+    assert.deepStrictEqual(route("/p/mcp/x-search", "/p"), { forward: "/mcp/x-search" });
+    assert.deepStrictEqual(route("/p/mcp/research", "/p"), { forward: "/mcp/research" });
     assert.isUndefined(route("/p/mcp/other", "/p"));
   });
 
@@ -114,11 +116,25 @@ describe("MCP in launches", () => {
 
 describe("manual MCP setup", () => {
   it.each(MCP_TOOLS)("%s gets steps that name every server and parse", (tool) => {
-    const steps = mcpSteps(tool, ["context7", "firecrawl"], { models: [], apiKey: key, platform: "unix" });
+    const steps = mcpSteps(tool, MCP_SERVER_IDS, { models: [], apiKey: key, platform: "unix" });
     const text = JSON.stringify(steps);
     for (const path of ["/mcp/context7", "/mcp/firecrawl", "/mcp/x-search", "/mcp/research"])
       assert.include(text, path);
     for (const step of steps) if (step.kind === "code" && step.language === "json") JSON.parse(step.code);
+  });
+});
+
+describe("the servers in a sentence", () => {
+  it("name one, two or every server as English does", () => {
+    assert.strictEqual(mcpLabels(["context7"]), "Context7");
+    assert.strictEqual(mcpLabels(["context7", "x-search"]), "Context7 and X Search");
+    assert.strictEqual(mcpLabels(MCP_SERVER_IDS), "Context7, Firecrawl, X Search and Deep Research");
+    assert.strictEqual(MCP_SERVER_CHOICE, "context7, firecrawl, x-search or research");
+  });
+
+  it("give the command that turns on just the servers named", () => {
+    assert.strictEqual(mcpEnable(["x-search"]), "impact mcp enable x-search");
+    assert.strictEqual(mcpEnable(MCP_SERVER_IDS), "impact mcp enable context7 firecrawl x-search research");
   });
 });
 
@@ -132,8 +148,11 @@ describe("impact mcp", () => {
     assert.include(listed.stdout, "firecrawl: off");
     assert.include(listed.stdout, "x-search: on");
     const error = await impact(["mcp", "enable", "nope"]).catch((failure: { stderr: string }) => failure);
-    assert.include("stderr" in error ? error.stderr : "", "Unknown MCP server nope");
-    await impact(["mcp", "disable", "context7"]);
+    assert.include(
+      "stderr" in error ? error.stderr : "",
+      "Unknown MCP server nope. Choose context7, firecrawl, x-search or research.",
+    );
+    await impact(["mcp", "disable", "context7", "x-search"]);
     assert.include((await impact(["mcp", "list"])).stdout, "context7: off");
     assert.include((await impact(["mcp", "enable", "firecrawl"])).stdout, "add it from the next launch");
   });
