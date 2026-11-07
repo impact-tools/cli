@@ -34,16 +34,20 @@ const CompactSettings = Schema.Struct({
 /**
  * The listed model a `--model` or settings value names. The list doesn't say which models are pinned
  * to a dated snapshot, so a `-YYYYMMDD` suffix on any Claude model's name selects the model itself.
+ * A listed id is taken as it is first: `preset/<slug>` is the one listed id with a slash, and its row
+ * carries the preset's own window. Any other id with a slash names no model.
  */
 export function selectedModel(models: readonly Model[], id: string | undefined): Model | undefined {
-  if (id === undefined || id.includes("/")) return undefined;
+  if (id === undefined) return undefined;
+  const listed = models.find((model) => model.id === id);
+  if (listed !== undefined || id.includes("/")) return listed;
   const named = (name: string) =>
     models.find(
       (model) =>
         model.id === name || claudeAliases({ id: model.id, contextTokens: model.max_input_tokens ?? 0 }).includes(name),
     );
   const lowered = id.toLowerCase();
-  return models.find((model) => model.id === id) ?? named(lowered) ?? named(lowered.replace(/-\d{8}(?=\[1m\]$|$)/, ""));
+  return named(lowered) ?? named(lowered.replace(/-\d{8}(?=\[1m\]$|$)/, ""));
 }
 
 /** A listed model in the setup generator's terms, which share the launch's windows and `/model` menu. */

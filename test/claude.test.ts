@@ -95,6 +95,19 @@ describe("selectedModel", () => {
     assert.isUndefined(selectedModel([{ id: canonical.id }], "opus-5.5[1m]"));
   });
 
+  it("selects auto and a listed preset by id, and no other id with a slash", () => {
+    const auto = { id: "auto", max_input_tokens: 272_000 };
+    const preset = { id: "preset/deep", max_input_tokens: 200_000 };
+    const models = [{ id: "claude-opus-5-5", max_input_tokens: 1_000_000 }, auto, preset];
+    assert.strictEqual(selectedModel(models, "auto"), auto);
+    assert.strictEqual(selectedModel(models, "AUTO"), auto);
+    assert.strictEqual(selectedModel(models, "preset/deep"), preset);
+    assert.isUndefined(selectedModel(models, "preset/other"));
+    assert.isUndefined(selectedModel(models, "preset/DEEP"));
+    // A launch on a preset is sized for its own window, not the largest one listed.
+    assert.strictEqual(unknownModelContext([auto, preset], selectedModel([auto, preset], "preset/deep")), 272_000);
+  });
+
   it("selects a model by a dated snapshot spelling although the list never names its snapshot", () => {
     const haiku = { id: "claude-haiku-4-5", max_input_tokens: 200_000 };
     for (const id of ["claude-haiku-4-5-20251001", "claude-haiku-4.5-20251001", "CLAUDE-HAIKU-4-5-20251001"])
@@ -168,6 +181,8 @@ describe("prepareClaude", () => {
       assert.notInclude(prepared.args.join(" "), key);
       assert.strictEqual(prepared.env.ANTHROPIC_BASE_URL, connection.baseUrl);
       assert.strictEqual(prepared.env.CLAUDE_CODE_USE_VERTEX, "0");
+      assert.strictEqual(prepared.env.CLAUDE_CODE_GATEWAY_HINT_HEADERS, "1");
+      assert.strictEqual(prepared.settings.env.CLAUDE_CODE_GATEWAY_HINT_HEADERS, "1");
       assert.strictEqual(prepared.env.IMPACT_API_KEY, key);
       expect(prepared.settings.apiKeyHelper).toMatch(/'helper' 'token'$/);
       expect(prepared.settings.statusLine.command).toMatch(/'helper' 'status-line'$/);
@@ -191,6 +206,22 @@ describe("prepareClaude", () => {
       assert.strictEqual(env.ANTHROPIC_DEFAULT_OPUS_MODEL, "custom-opus");
       assert.strictEqual(settings.env.CLAUDE_CODE_MAX_CONTEXT_TOKENS, "272000");
       assert.strictEqual(settings.modelSettings["gpt-6.1-sol"].autoCompactWindow, 272_000);
+    }).pipe(Effect.scoped, Effect.provide(services)),
+  );
+
+  it.effect("keeps a request hint setting the user chose", () =>
+    Effect.gen(function* () {
+      process.env.CLAUDE_CODE_GATEWAY_HINT_HEADERS = "0";
+      const fromEnv = yield* prepare([]);
+      assert.strictEqual(fromEnv.env.CLAUDE_CODE_GATEWAY_HINT_HEADERS, "0");
+      assert.notProperty(fromEnv.settings.env, "CLAUDE_CODE_GATEWAY_HINT_HEADERS");
+      delete process.env.CLAUDE_CODE_GATEWAY_HINT_HEADERS;
+      const fromSettings = yield* prepare([
+        "--settings",
+        JSON.stringify({ env: { CLAUDE_CODE_GATEWAY_HINT_HEADERS: "0" } }),
+      ]);
+      assert.strictEqual(fromSettings.settings.env.CLAUDE_CODE_GATEWAY_HINT_HEADERS, "0");
+      assert.notProperty(fromSettings.env, "CLAUDE_CODE_GATEWAY_HINT_HEADERS");
     }).pipe(Effect.scoped, Effect.provide(services)),
   );
 

@@ -39,7 +39,10 @@ export function unknownModelContext(
   return windows.length === 0 ? undefined : Math.max(...windows);
 }
 
-/** `~/.claude/settings.json` for Claude Code without the launcher: the key and the `/model` menu. */
+/**
+ * `~/.claude/settings.json` for Claude Code without the launcher: the key, the `/model` menu, and the
+ * request hints `auto` and the presets route by.
+ */
 export function claudeSettings(options: SetupOptions) {
   const context = unknownModelContext(options.models, undefined);
   const windows = options.models.flatMap((model) => {
@@ -52,6 +55,8 @@ export function claudeSettings(options: SetupOptions) {
       ANTHROPIC_AUTH_TOKEN: options.apiKey,
       ANTHROPIC_API_KEY: "",
       ...(context === undefined ? {} : { CLAUDE_CODE_MAX_CONTEXT_TOKENS: String(context) }),
+      // Claude Code then says what each request is for (the conversation, a subagent, a compaction).
+      CLAUDE_CODE_GATEWAY_HINT_HEADERS: "1",
     },
     modelPicker: claudeModelPicker(options.models),
     ...(windows.length === 0 ? {} : { modelSettings: Object.fromEntries(windows) }),
