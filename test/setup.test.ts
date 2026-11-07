@@ -126,6 +126,7 @@ describe("Claude Code", () => {
       ANTHROPIC_AUTH_TOKEN: key,
       ANTHROPIC_API_KEY: "",
       CLAUDE_CODE_MAX_CONTEXT_TOKENS: "500000",
+      CLAUDE_CODE_GATEWAY_HINT_HEADERS: "1",
     });
     assert.deepStrictEqual(
       settings.modelPicker.options.map((option) => option.model),

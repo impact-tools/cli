@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Effect, Predicate } from "effect";
 import { toMerged } from "es-toolkit";
 
 import { enabledMcpServers } from "../../config/Mcp.ts";
@@ -15,6 +15,7 @@ export const prepareClaude = Effect.fn("prepareClaude")(function* ({ args, conne
   const catalog = yield* claudeModels(connection);
   const context = unknownModelContext(catalog.models, selectedModel(catalog.models, config.model));
   const statusLine = yield* prepareStatusLine(connection, config.statusLine);
+  const settingsEnv = Predicate.isObject(config.effective.env) ? config.effective.env : {};
   const gatewayEnv = {
     ANTHROPIC_BASE_URL: connection.baseUrl,
     ANTHROPIC_API_KEY: "",
@@ -24,6 +25,11 @@ export const prepareClaude = Effect.fn("prepareClaude")(function* ({ args, conne
     ...(context !== undefined && !env.CLAUDE_CODE_MAX_CONTEXT_TOKENS
       ? { CLAUDE_CODE_MAX_CONTEXT_TOKENS: String(context) }
       : {}),
+    // Claude Code tells a gateway what each request is for (the main conversation, a subagent, a
+    // compaction) only when asked; `auto` and the presets route by it. A user's own value stays.
+    ...(env.CLAUDE_CODE_GATEWAY_HINT_HEADERS || "CLAUDE_CODE_GATEWAY_HINT_HEADERS" in settingsEnv
+      ? {}
+      : { CLAUDE_CODE_GATEWAY_HINT_HEADERS: "1" }),
     CLAUDE_CODE_USE_BEDROCK: "0",
     CLAUDE_CODE_USE_VERTEX: "0",
     CLAUDE_CODE_USE_FOUNDRY: "0",

@@ -13,13 +13,13 @@ import { version } from "../package.json";
 import * as Http from "../src/api/Http.ts";
 import { createDeviceClient, waitForDeviceToken } from "../src/auth/Device.ts";
 import { command } from "../src/Command.ts";
-import { ApiKey, CreatedApiKey, DEFAULT_FUNDING, type KeyRouting, type KeyTools } from "../src/schemas/Billing.ts";
+import { ApiKey, CreatedApiKey, DEFAULT_FUNDING, type KeyTools } from "../src/schemas/Billing.ts";
 import { DEFAULT_SEARCH_EFFORT, SEARCH_MODEL_ID } from "../src/schemas/ModelVocabulary.ts";
 import { makeOutput, Output } from "../src/ui/Output.ts";
 import { isolatedEnvironment } from "./support/Environment.ts";
 import { catalog } from "./support/Impact.ts";
 
-/** A new key's tools and routing as the server answers them: the defaults are the server's, not public. */
+/** A new key's tools as the server answers them: the defaults are the server's, not public. */
 const KEY_TOOLS: KeyTools = {
   webSearch: true,
   searchModel: SEARCH_MODEL_ID,
@@ -28,11 +28,37 @@ const KEY_TOOLS: KeyTools = {
   replaceNativeSearch: false,
   vision: true,
 };
-const KEY_ROUTING: KeyRouting = {
-  enabled: false,
-  targets: ["gpt-6.1-sol", "gpt-5.6-sol", "gpt-5.6-luna"],
-  ceiling: "max",
-};
+/** The retired smart routing the server still sends with every key, for CLI 0.5.0 and older. */
+const RETIRED_ROUTING = { enabled: false, targets: [], ceiling: "max" } as const;
+
+/** A key as the server answers it. */
+const serverKey = (id: string, name: string, secret: string) =>
+  new ApiKey({
+    id,
+    name,
+    suffix: secret.slice(-4),
+    canCopy: true,
+    monthlyLimitMicros: null,
+    funding: [...DEFAULT_FUNDING],
+    tools: KEY_TOOLS,
+    routing: RETIRED_ROUTING,
+    createdAt: 0,
+    lastUsedAt: null,
+    requests30d: 0,
+    charged30dMicros: 0,
+    chargedThisMonthMicros: 0,
+  });
+
+describe("API key schema", () => {
+  it("decodes a key with the retired routing the server sends, and one a later server sends without it", () => {
+    const codec = Schema.toCodecJson(ApiKey);
+    const encoded = Schema.encodeSync(codec)(serverKey("key_1", "impact-cli", secretFor(1))) as Record<string, unknown>;
+    expect(encoded.routing).toEqual(RETIRED_ROUTING);
+    expect(Schema.decodeUnknownSync(codec)(encoded).routing).toEqual(RETIRED_ROUTING);
+    const { routing: _retired, ...current } = encoded;
+    expect(Schema.decodeUnknownSync(codec)(current).routing).toBeUndefined();
+  });
+});
 
 const servers: ReturnType<typeof createServer>[] = [];
 afterEach(async () => {
@@ -172,21 +198,7 @@ async function impactServer(options: ImpactOptions = {}) {
             const key = { id: `key_${n}`, secret: secretFor(n), ...message.payload };
             state.created.push(key);
             const created = new CreatedApiKey({
-              key: new ApiKey({
-                id: key.id,
-                name: key.name,
-                suffix: key.secret.slice(-4),
-                canCopy: true,
-                monthlyLimitMicros: null,
-                funding: [...DEFAULT_FUNDING],
-                tools: KEY_TOOLS,
-                routing: KEY_ROUTING,
-                createdAt: 0,
-                lastUsedAt: null,
-                requests30d: 0,
-                charged30dMicros: 0,
-                chargedThisMonthMicros: 0,
-              }),
+              key: serverKey(key.id, key.name, key.secret),
               secret: Redacted.make(key.secret),
             });
             return JSON.stringify({

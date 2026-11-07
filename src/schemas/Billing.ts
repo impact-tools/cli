@@ -87,15 +87,17 @@ export const KeyTools = Schema.Struct({
 });
 export type KeyTools = typeof KeyTools.Type;
 
-/** How far smart routing may push reasoning: a cap on the effort it picks from a target's ladder. */
+/** How far smart routing could push reasoning: a cap on the effort it picked from a target's ladder. */
 const ROUTING_CEILINGS = ["low", "medium", "high", "max"] as const;
 export type RoutingCeiling = (typeof ROUTING_CEILINGS)[number];
 
-/** Smart routing for one key, saved with it. */
+/**
+ * Retired: smart routing for one key, which account presets (`auto`, `preset/<slug>`) replaced. Kept
+ * so CLI 0.5.0 and older and SDK 0.2.0, which require it on a key, can still decode one; the server
+ * always sends it switched off.
+ */
 export const KeyRouting = Schema.Struct({
-  /** Opt-in: while off, the key is not offered smart routing. */
   enabled: Schema.Boolean,
-  /** The complete allowlist of catalog model ids, in order. The first one is the fail-open target. */
   targets: Schema.Array(Schema.String),
   ceiling: Schema.Literals(ROUTING_CEILINGS),
 });
@@ -121,7 +123,8 @@ export class ApiKey extends Schema.Class<ApiKey>("@impact-llm/schemas/ApiKey")({
   monthlyLimitMicros: Schema.NullOr(Micros),
   funding: Schema.Array(FundingStep),
   tools: KeyTools,
-  routing: KeyRouting,
+  /** Retired, always switched off; see {@link KeyRouting}. Optional so a later server may stop sending it. */
+  routing: Schema.optional(KeyRouting),
   createdAt: Instant,
   lastUsedAt: Schema.NullOr(Instant),
   requests30d: Schema.Int,
@@ -137,7 +140,17 @@ export class CreatedApiKey extends Schema.Class<CreatedApiKey>("@impact-llm/sche
   secret: Schema.Redacted(Schema.String),
 }) {}
 
-export const RequestEndpoint = Schema.Literals(["chat", "responses", "messages", "search"]);
+/** The API a request came in on, as its log row records it; `gemini` is Google's Gemini API. */
+export const RequestEndpoint = Schema.Literals([
+  "chat",
+  "responses",
+  "messages",
+  "search",
+  "images",
+  "videos",
+  "embeddings",
+  "gemini",
+]);
 export type RequestEndpoint = typeof RequestEndpoint.Type;
 
 export const RequestStatus = Schema.Literals(["pending", "success", "error", "cancelled"]);
@@ -154,7 +167,6 @@ export const BillingRpcs = [
       funding: Schema.Array(FundingStep),
       /** Left out, the key starts with the defaults. */
       tools: Schema.optional(KeyTools),
-      routing: Schema.optional(KeyRouting),
     },
     success: CreatedApiKey,
     error: BillingErrors,
@@ -166,7 +178,6 @@ export const BillingRpcs = [
       monthlyLimitMicros: Schema.optional(keyLimit),
       funding: Schema.optional(Schema.Array(FundingStep)),
       tools: Schema.optional(KeyTools),
-      routing: Schema.optional(KeyRouting),
     },
     success: ApiKey,
     error: BillingErrors,

@@ -43,8 +43,22 @@ const GATEWAY_HEADERS = new Set([
   "chatgpt-account-id",
   "openai-organization",
 ]);
-const API_PATH =
-  /^\/v1\/(?:models(?:\/[^/?]+)?|usage(?:\/spend)?|responses(?:\/compact)?|chat\/completions|messages(?:\/count_tokens)?|images\/(?:generations|edits))(?:\?|$)/;
+/**
+ * Impact's API routes the proxy sends with the key, each a pattern after `/v1/`. A model's path takes its
+ * Gemini API calls too (`/v1/models/{model}:generateContent`); a video's id, one of xAI's, never starts
+ * with a dot, so no dot segment can climb out of `/v1/videos/`.
+ */
+const API_ROUTES = [
+  String.raw`models(?:\/[^/?]+)?`,
+  String.raw`usage(?:\/spend)?`,
+  String.raw`responses(?:\/compact)?`,
+  String.raw`chat\/completions`,
+  String.raw`messages(?:\/count_tokens)?`,
+  String.raw`images\/(?:generations|edits)`,
+  String.raw`videos\/[\w-][\w.-]*(?:\/content)?`,
+  String.raw`embeddings`,
+];
+const API_PATH = new RegExp(String.raw`^\/v1\/(?:${API_ROUTES.join("|")})(?:\?|$)`);
 const NATIVE_PATH = /^\/(?:aiserver|agent|origin)\.v1\.[A-Za-z]+Service\/[A-Za-z][A-Za-z0-9]*(?:\?|$)/;
 
 type Request = IncomingMessage | Http2ServerRequest;

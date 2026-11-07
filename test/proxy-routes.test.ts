@@ -21,9 +21,9 @@ import { cursorProxy, isApiPath } from "../src/clients/cursor/Proxy.ts";
 const server = join(import.meta.dirname, "../../packages/server/src/v1");
 const gateway = join(import.meta.dirname, "../../packages/gateway/src/providers/chatgpt/Native.ts");
 const hasServerSources = existsSync(server) && existsSync(gateway);
-const ROUTE_FILES = ["Routes.ts", "ReadRoutes.ts", "NativeRoutes.ts"];
-/** The namespaces Impact's API and Codex's native protocols live under. */
-const API_PATH = /^\/(?:v1|backend-api\/codex|api\/codex)\//;
+const ROUTE_FILES = ["Routes.ts", "ReadRoutes.ts", "NativeRoutes.ts", "GeminiRoutes.ts"];
+/** The namespaces Impact's API, the Gemini API's own version and Codex's native protocols live under. */
+const API_PATH = /^\/(?:v1|v1beta|backend-api\/codex|api\/codex)\//;
 
 const literals = (source: string, name: string) => {
   const list = new RegExp(`${name}\\s*=\\s*\\[([^\\]]*)\\]`).exec(source)?.[1];
@@ -64,7 +64,8 @@ const serverRoutes = () => {
 
 const closedBy = (closed: Readonly<Record<string, string>>, path: string) =>
   Object.keys(closed).find((entry) => (entry.endsWith("/*") ? path.startsWith(entry.slice(0, -1)) : entry === path));
-const sample = (path: string) => path.replace(/:\w+/g, "gpt-6.1-sol");
+/** A route's path as a client sends it: each parameter segment filled in, a literal `:action` after one kept. */
+const sample = (path: string) => path.replace(/\/:\w+/g, "/gpt-6.1-sol");
 
 /** Paths the Cursor proxy and `impact proxy` keep away from Impact's API. */
 const CLOSED_API_ROUTES: Readonly<Record<string, string>> = {
@@ -78,7 +79,13 @@ describe.skipIf(!hasServerSources)("proxy routes against the server", () => {
   const routes = hasServerSources ? serverRoutes() : [];
 
   it("reads the server's routes", () => {
-    for (const path of ["/v1/responses", "/v1/images/edits", "/backend-api/codex/images/generations"])
+    for (const path of [
+      "/v1/responses",
+      "/v1/images/edits",
+      "/backend-api/codex/images/generations",
+      "/v1/models/*",
+      "/v1beta/models/*",
+    ])
       assert.include(routes, path);
     assert.isTrue(routes.some((path) => path.startsWith("/v1/alpha/")));
   });
@@ -104,11 +111,60 @@ describe.skipIf(!hasServerSources)("proxy routes against the server", () => {
   });
 });
 
+describe("Codex proxy paths", () => {
+  it("forwards images under both of Codex's bases, and closes what Codex never calls", () => {
+    for (const path of ["/v1/images/generations", "/backend-api/codex/images/edits"])
+      assert.deepStrictEqual(route(`/n${path}`, "/n"), { forward: path });
+    for (const path of [
+      "/v1/videos/generations",
+      "/v1/videos/41eb9a5f-cbd4-9f21-8d59-79005f1e61b7/content",
+      "/v1/embeddings",
+      "/v1/models/gemini-3.8-flash:generateContent",
+    ]) {
+      assert.isUndefined(route(`/n${path}`, "/n"), path);
+      assert.isDefined(closedBy(CLOSED_CODEX_ROUTES, path), path);
+    }
+  });
+});
+
 describe("Cursor proxy API paths", () => {
   it("forwards token counting and single-model reads, never self-revocation", () => {
     for (const path of ["/v1/messages/count_tokens", "/v1/models/claude-sonnet-5-5", "/v1/models/gpt-6.1-sol?x=1"])
       assert.isTrue(isApiPath(path), path);
     for (const path of ["/v1/keys/self/revoke", "/v1/models/a/b", "/v1/messages/batches"])
+      assert.isFalse(isApiPath(path), path);
+  });
+
+  it("forwards images, embeddings and a model's Gemini API calls, not the Gemini API's own /v1beta", () => {
+    for (const path of [
+      "/v1/images/generations",
+      "/v1/images/edits",
+      "/v1/embeddings",
+      "/v1/models/gemini-3.8-flash:generateContent",
+      "/v1/models/gemini-3.8-flash:streamGenerateContent?alt=sse",
+    ])
+      assert.isTrue(isApiPath(path), path);
+    for (const path of ["/v1/images/variations", "/v1/embeddings/x", "/v1beta/models/gemini-3.8-flash:generateContent"])
+      assert.isFalse(isApiPath(path), path);
+  });
+
+  it("forwards exactly the five video routes, and no dot segment out of them", () => {
+    for (const path of [
+      "/v1/videos/generations",
+      "/v1/videos/edits",
+      "/v1/videos/extensions",
+      "/v1/videos/41eb9a5f-cbd4-9f21-8d59-79005f1e61b7",
+      "/v1/videos/41eb9a5f-cbd4-9f21-8d59-79005f1e61b7/content",
+    ])
+      assert.isTrue(isApiPath(path), path);
+    for (const path of [
+      "/v1/videos",
+      "/v1/videos/a/b",
+      "/v1/videos/a/content/x",
+      "/v1/videos/..",
+      "/v1/videos/../content",
+      "/v1/videos/%2e%2e/content",
+    ])
       assert.isFalse(isApiPath(path), path);
   });
 });
