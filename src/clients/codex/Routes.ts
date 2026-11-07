@@ -22,10 +22,14 @@ export const CLOSED_CODEX_ROUTES: Readonly<Record<string, string>> = {
   "/v1/chat/completions": "Codex speaks only the Responses API",
   "/v1/messages": "Codex speaks only the Responses API",
   "/v1/messages/count_tokens": "Codex speaks only the Responses API",
-  "/v1/models/:model": "Codex reads the whole catalog",
+  // One model's read, and its Gemini API calls (`POST /v1/models/{model}:generateContent` and the rest).
+  "/v1/models/*": "Codex reads the whole catalog and does not call the Gemini API",
   "/v1/usage": "the CLI reads the balance itself; Codex polls /api/codex/usage",
   "/v1/usage/spend": "spending is shown by impact status",
   "/v1/keys/self/revoke": "a client must never revoke the key it runs on",
+  "/v1beta/*": "Codex does not call the Gemini API",
+  "/v1/videos/*": "Codex does not call the Videos API",
+  "/v1/embeddings": "Codex does not call the Embeddings API",
   "/v1/alpha/*": "server-side context management is off on Impact",
   "/backend-api/codex/alpha/*": "server-side context management is off on Impact",
 };
