@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.0](https://github.com/impact-tools/cli/compare/v0.7.0...v0.8.0) (2026-11-08)
+
+
+### Features
+
+* **mcp:** Search and Creative Studio servers in `impact mcp`; effect 4.1.2 ([0cdfcec](https://github.com/impact-tools/cli/commit/0cdfcec496e3aed387795a5b8ff3e89ec0a6c7b3))
+
 ## [0.7.0](https://github.com/impact-tools/cli/compare/v0.6.0...v0.7.0) (2026-11-07)
 
 
