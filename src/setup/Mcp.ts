@@ -16,13 +16,27 @@ import {
 export const MCP_SERVERS = {
   context7: { label: "Context7", path: "/mcp/context7" },
   firecrawl: { label: "Firecrawl", path: "/mcp/firecrawl" },
-  "x-search": { label: "X Search", path: "/mcp/x-search" },
-  research: { label: "Deep Research", path: "/mcp/research" },
+  search: { label: "Search", path: "/mcp/search" },
+  studio: { label: "Creative Studio", path: "/mcp/studio" },
 } as const;
 
 export type McpServer = keyof typeof MCP_SERVERS;
 
 export const MCP_SERVER_IDS = Object.keys(MCP_SERVERS) as McpServer[];
+
+/**
+ * The servers as earlier launches named them: X Search and Deep Research are the toolsets of Search
+ * now, which serves both at one URL. A saved setting or a command that names one means the server
+ * that carries it.
+ */
+export const LEGACY_MCP_SERVERS = { "x-search": "search", research: "search" } as const;
+
+/** The server `name` names, as launches name it now; `undefined` for a name no server has. */
+export const mcpServerNamed = (name: string): McpServer | undefined => {
+  if (Object.hasOwn(MCP_SERVERS, name)) return name as McpServer;
+  if (Object.hasOwn(LEGACY_MCP_SERVERS, name)) return LEGACY_MCP_SERVERS[name as keyof typeof LEGACY_MCP_SERVERS];
+  return undefined;
+};
 
 /** What the servers do, what they cost and how to add them elsewhere. */
 export const MCP_DOCS_URL = `${APP_ORIGIN}/docs/mcp`;
@@ -32,11 +46,11 @@ export const isMcpServer = (name: string): name is McpServer => Object.hasOwn(MC
 const and = new Intl.ListFormat("en-GB", { type: "conjunction" });
 const or = new Intl.ListFormat("en-GB", { type: "disjunction" });
 
-/** The servers' names for a sentence: "Context7, Firecrawl, X Search and Deep Research". */
+/** The servers' names for a sentence: "Context7, Firecrawl, Search and Creative Studio". */
 export const mcpLabels = (servers: readonly McpServer[]) =>
   and.format(servers.map((server) => MCP_SERVERS[server].label));
 
-/** Every server's id, one to choose: "context7, firecrawl, x-search or research". */
+/** Every server's id, one to choose: "context7, firecrawl, search or studio". */
 export const MCP_SERVER_CHOICE = or.format(MCP_SERVER_IDS);
 
 /** The command that turns `servers` on. */

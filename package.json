@@ -29,14 +29,14 @@
   },
   "devDependencies": {
     "@bufbuild/protobuf": "1.10.1",
-    "@effect/platform-node": "4.0.2",
-    "@effect/vitest": "4.0.2",
+    "@effect/platform-node": "4.1.2",
+    "@effect/vitest": "4.1.2",
     "@types/bun": "1.4.2",
     "@types/http-proxy": "1.17.17",
     "@types/which": "3.0.4",
     "@vitest/coverage-v8": "5.0.2",
     "better-auth": "1.7.6",
-    "effect": "4.0.2",
+    "effect": "4.1.2",
     "env-paths": "4.0.0",
     "es-toolkit": "1.52.0",
     "http-proxy": "1.18.1",
@@ -53,9 +53,6 @@
     "node": ">=22.13"
   },
   "packageManager": "bun@1.4.2",
-  "overrides": {
-    "@effect/platform-node-shared": "4.0.2"
-  },
   "patchedDependencies": {
     "http-proxy@1.18.1": "patches/http-proxy@1.18.1.patch"
   }

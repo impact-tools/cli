@@ -12,6 +12,15 @@ export type ModelEffort = (typeof MODEL_EFFORTS)[number];
 /** The model that answers the gateway's `web_search` unless the key names another; searches are priced at it. */
 export const SEARCH_MODEL_ID = "gemini-3.8-flash";
 
+/**
+ * The `searchModel` a key takes to search on Perplexity's web accounts instead of a Gemini model: a
+ * Pro Search on a supported account, answered with sources, priced per search.
+ */
+export const PERPLEXITY_SEARCH_MODEL = "perplexity";
+
+/** Whether a key's `searchModel` names Perplexity rather than a Gemini model. */
+export const isPerplexitySearch = (modelId: string) => modelId === PERPLEXITY_SEARCH_MODEL;
+
 /** How hard the search model thinks: the Gemini 3 thinking levels, lowest first. */
 export const SEARCH_EFFORTS = ["low", "medium", "high"] as const;
 export type SearchEffort = (typeof SEARCH_EFFORTS)[number];

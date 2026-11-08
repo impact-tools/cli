@@ -4,15 +4,14 @@ import { Argument, Command } from "effect/cli";
 import { mcpFile, readMcpSettings, setMcpServers } from "../config/Mcp.ts";
 import { CliError } from "../Errors.ts";
 import {
-  isMcpServer,
   MCP_DOCS_URL,
   MCP_SERVER_CHOICE,
   MCP_SERVER_IDS,
   MCP_SERVERS,
   mcpEnable,
   mcpLabels,
+  mcpServerNamed,
   mcpUrl,
-  type McpServer,
 } from "../setup/Mcp.ts";
 import { Output } from "../ui/Output.ts";
 
@@ -26,10 +25,11 @@ const names = Argument.String("server").pipe(
 
 const parseServers = (values: readonly string[]) =>
   Effect.gen(function* () {
-    const unknown = values.filter((value) => !isMcpServer(value));
+    const unknown = values.filter((value) => mcpServerNamed(value) === undefined);
     if (unknown.length > 0)
       return yield* new CliError({ message: `Unknown MCP server ${unknown.join(", ")}. Choose ${MCP_SERVER_CHOICE}.` });
-    return values as McpServer[];
+    // A name an earlier launch had (`x-search`, `research`) means the server that carries it now.
+    return [...new Set(values.flatMap((value) => mcpServerNamed(value) ?? []))];
   });
 
 const showServers = Effect.fn(function* () {

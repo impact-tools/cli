@@ -2,7 +2,7 @@ import { NodeServices } from "@effect/platform-node";
 import { assert, describe, it } from "@effect/vitest";
 import { Effect, Layer, Schema } from "effect";
 import { execFile } from "node:child_process";
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { promisify } from "node:util";
 
@@ -42,6 +42,24 @@ describe("MCP settings", () => {
       assert.deepStrictEqual(yield* enabledMcpServers, ["context7"]);
       const saved = JSON.parse(yield* Effect.promise(() => readFile(join(environment.directory, "mcp.json"), "utf8")));
       assert.deepStrictEqual(saved, { enabled: ["context7"], dismissed: [] });
+    }).pipe(Effect.provide(NodeServices.layer)),
+  );
+
+  it.effect("keep the servers of a file saved before Search named them", () =>
+    Effect.gen(function* () {
+      // An earlier launch wrote X Search and Deep Research; this build serves both from Search.
+      yield* Effect.promise(() =>
+        writeFile(
+          join(environment.directory, "mcp.json"),
+          JSON.stringify({ enabled: ["x-search", "research", "context7"], dismissed: ["research"] }),
+        ),
+      );
+      // A server they turned down (Deep Research) stays turned down as the server that carries it.
+      assert.deepStrictEqual(yield* readMcpSettings, { enabled: ["context7", "search"], dismissed: ["search"] });
+      assert.deepStrictEqual(yield* enabledMcpServers, ["context7", "search"]);
+      // A launch that names one of them chooses Search too.
+      process.env.IMPACT_MCP = "x-search";
+      assert.deepStrictEqual(yield* enabledMcpServers, ["search"]);
     }).pipe(Effect.provide(NodeServices.layer)),
   );
 
@@ -101,15 +119,15 @@ describe("MCP in launches", () => {
       context7: { url: "https://127.0.0.1:1/p/mcp/context7" },
     });
     assert.deepStrictEqual(route("/p/mcp/firecrawl", "/p"), { forward: "/mcp/firecrawl" });
-    assert.deepStrictEqual(route("/p/mcp/x-search", "/p"), { forward: "/mcp/x-search" });
-    assert.deepStrictEqual(route("/p/mcp/research", "/p"), { forward: "/mcp/research" });
+    assert.deepStrictEqual(route("/p/mcp/search", "/p"), { forward: "/mcp/search" });
+    assert.deepStrictEqual(route("/p/mcp/studio", "/p"), { forward: "/mcp/studio" });
     assert.isUndefined(route("/p/mcp/other", "/p"));
   });
 
   it("builds Claude's config for several servers at one origin", () => {
     assert.deepStrictEqual(
-      Object.keys(claudeMcpConfig(["context7", "firecrawl", "x-search"], "https://x", "h").mcpServers),
-      ["context7", "firecrawl", "x-search"],
+      Object.keys(claudeMcpConfig(["context7", "firecrawl", "search"], "https://x", "h").mcpServers),
+      ["context7", "firecrawl", "search"],
     );
   });
 });
@@ -118,8 +136,7 @@ describe("manual MCP setup", () => {
   it.each(MCP_TOOLS)("%s gets steps that name every server and parse", (tool) => {
     const steps = mcpSteps(tool, MCP_SERVER_IDS, { models: [], apiKey: key, platform: "unix" });
     const text = JSON.stringify(steps);
-    for (const path of ["/mcp/context7", "/mcp/firecrawl", "/mcp/x-search", "/mcp/research"])
-      assert.include(text, path);
+    for (const path of ["/mcp/context7", "/mcp/firecrawl", "/mcp/search", "/mcp/studio"]) assert.include(text, path);
     for (const step of steps) if (step.kind === "code" && step.language === "json") JSON.parse(step.code);
   });
 });
@@ -127,33 +144,34 @@ describe("manual MCP setup", () => {
 describe("the servers in a sentence", () => {
   it("name one, two or every server as English does", () => {
     assert.strictEqual(mcpLabels(["context7"]), "Context7");
-    assert.strictEqual(mcpLabels(["context7", "x-search"]), "Context7 and X Search");
-    assert.strictEqual(mcpLabels(MCP_SERVER_IDS), "Context7, Firecrawl, X Search and Deep Research");
-    assert.strictEqual(MCP_SERVER_CHOICE, "context7, firecrawl, x-search or research");
+    assert.strictEqual(mcpLabels(["context7", "search"]), "Context7 and Search");
+    assert.strictEqual(mcpLabels(MCP_SERVER_IDS), "Context7, Firecrawl, Search and Creative Studio");
+    assert.strictEqual(MCP_SERVER_CHOICE, "context7, firecrawl, search or studio");
   });
 
   it("give the command that turns on just the servers named", () => {
-    assert.strictEqual(mcpEnable(["x-search"]), "impact mcp enable x-search");
-    assert.strictEqual(mcpEnable(MCP_SERVER_IDS), "impact mcp enable context7 firecrawl x-search research");
+    assert.strictEqual(mcpEnable(["search"]), "impact mcp enable search");
+    assert.strictEqual(mcpEnable(MCP_SERVER_IDS), "impact mcp enable context7 firecrawl search studio");
   });
 });
 
 describe("impact mcp", () => {
   it("turns servers on, lists them and refuses an unknown one", async () => {
-    const enabled = await impact(["mcp", "enable", "context7", "x-search"]);
-    assert.include(enabled.stdout, "Context7 and X Search on:");
+    const enabled = await impact(["mcp", "enable", "context7", "search"]);
+    assert.include(enabled.stdout, "Context7 and Search on:");
     assert.include(enabled.stdout, "add them from the next launch");
     const listed = await impact(["mcp", "list"]);
     assert.include(listed.stdout, "context7: on");
     assert.include(listed.stdout, "firecrawl: off");
-    assert.include(listed.stdout, "x-search: on");
+    assert.include(listed.stdout, "search: on");
     const error = await impact(["mcp", "enable", "nope"]).catch((failure: { stderr: string }) => failure);
     assert.include(
       "stderr" in error ? error.stderr : "",
-      "Unknown MCP server nope. Choose context7, firecrawl, x-search or research.",
+      "Unknown MCP server nope. Choose context7, firecrawl, search or studio.",
     );
-    await impact(["mcp", "disable", "context7", "x-search"]);
+    await impact(["mcp", "disable", "context7", "search"]);
     assert.include((await impact(["mcp", "list"])).stdout, "context7: off");
     assert.include((await impact(["mcp", "enable", "firecrawl"])).stdout, "add it from the next launch");
-  });
+    // Six launches of the CLI in one test: under a loaded machine, past the default timeout.
+  }, 20_000);
 });
