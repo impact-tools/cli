@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.1](https://github.com/impact-tools/cli/compare/v0.8.0...v0.8.1) (2026-11-13)
+
+
+### Bug Fixes
+
+* **cli:** run npm .cmd shims on Windows without spawn EINVAL ([b95ed57](https://github.com/impact-tools/cli/commit/b95ed57203b47086812ba028e748dfcbc671512b))
+
 ## [0.8.0](https://github.com/impact-tools/cli/compare/v0.7.0...v0.8.0) (2026-11-08)
 
 
