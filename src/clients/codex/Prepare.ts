@@ -3,26 +3,29 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process";
 import { omit } from "es-toolkit";
 
 import { fetchUsage } from "../../api/Usage.ts";
-import { CliError, mapPlatformError } from "../../Errors.ts";
-import { clientEnvironment, type LaunchOptions } from "../Client.ts";
-import { impactCodexAuth } from "./Auth.ts";
-import { configureCodex } from "./Config.ts";
-import { requireProxy } from "../../proxy/Control.ts";
 import { enabledMcpServers } from "../../config/Mcp.ts";
+import { CliError, mapPlatformError } from "../../Errors.ts";
+import { requireProxy } from "../../proxy/Control.ts";
 import { codexMcpServers } from "../../setup/Mcp.ts";
 import { DEFAULT_MODEL } from "../../setup/Models.ts";
+import { clientEnvironment, type LaunchOptions } from "../Client.ts";
+import { resolveCommand } from "../Shim.ts";
+import { impactCodexAuth } from "./Auth.ts";
+import { configureCodex } from "./Config.ts";
 import { codexModels } from "./Models.ts";
 import { codexCaBundle } from "./Tls.ts";
 
 /** Runs Codex against the background proxy's loopback endpoint; Codex never sees the Impact key. */
 export const prepareCodex = Effect.fn("prepareCodex")(function* ({ executable, args, connection }: LaunchOptions) {
   const { setup, status } = yield* requireProxy(connection);
-  if (!setup.codex) return yield* new CliError({ message: "Add Codex to the proxy: impact proxy setup, then impact proxy restart." });
+  if (!setup.codex)
+    return yield* new CliError({ message: "Add Codex to the proxy: impact proxy setup, then impact proxy restart." });
   if (status.codexPort !== setup.codex.port)
     return yield* new CliError({ message: "The running proxy does not serve Codex yet. Run impact proxy restart." });
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+  const probe = resolveCommand(executable, ["--version"]);
   const versionText = yield* spawner
-    .string(ChildProcess.make(executable, ["--version"]))
+    .string(ChildProcess.make(probe.executable, probe.args))
     .pipe(mapPlatformError("Cannot run codex --version"));
   const version = /\b\d+\.\d+\.\d+\b/.exec(versionText)?.[0] ?? "0";
   const catalog = yield* codexModels(connection, version);

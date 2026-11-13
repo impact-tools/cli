@@ -7,13 +7,14 @@ import { closeSync, openSync } from "node:fs";
 import type { Connection } from "../config/Connection.ts";
 
 import { CliError, mapPlatformError } from "../Errors.ts";
-import { prepareClaude } from "./claude/Prepare.ts";
 import { prepareAntigravity } from "./antigravity/Prepare.ts";
+import { prepareClaude } from "./claude/Prepare.ts";
 import { executableVariable, findExecutable } from "./Client.ts";
 import { prepareCodex } from "./codex/Prepare.ts";
 import { prepareCursor } from "./cursor/Prepare.ts";
 import { offerMcp } from "./McpOffer.ts";
 import { prepareKilo, prepareOpenCode } from "./opencode/Prepare.ts";
+import { resolveCommand } from "./Shim.ts";
 
 /** `mcp`: the launch adds Impact's MCP servers that `impact mcp enable` turned on. */
 export const clients = {
@@ -40,7 +41,12 @@ const detached = (
     try: async () => {
       const log = openSync(output.log, output.append ? "a" : "w", 0o600);
       try {
-        const child = spawn(executable, args, { env, detached: true, stdio: ["ignore", log, log] });
+        const command = resolveCommand(executable, args);
+        const child = spawn(command.executable, [...command.args], {
+          env,
+          detached: true,
+          stdio: ["ignore", log, log],
+        });
         await Promise.race([once(child, "spawn"), once(child, "error").then(([error]) => Promise.reject(error))]);
         child.unref();
       } finally {
@@ -60,9 +66,10 @@ export const launch = Effect.fn("launch")(function* (client: Client, args: reado
   const { IMPACT_LAUNCH_CWD: _, ...env }: NodeJS.ProcessEnv = prepared.env;
   if ("detach" in prepared) return yield* detached(label, executable, prepared.args, env, prepared.detach);
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+  const command = resolveCommand(executable, prepared.args);
   process.exitCode = yield* spawner
     .exitCode(
-      ChildProcess.make(executable, prepared.args, {
+      ChildProcess.make(command.executable, command.args, {
         env,
         stdin: "inherit",
         stdout: "inherit",
