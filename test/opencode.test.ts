@@ -4,6 +4,8 @@ import { Effect } from "effect";
 
 import { openCodeModels } from "../src/clients/opencode/Models.ts";
 import { prepareKilo, prepareOpenCode } from "../src/clients/opencode/Prepare.ts";
+import { MODEL_EFFORTS } from "../src/schemas/ModelVocabulary.ts";
+import { DEFAULT_MODEL, SMALL_MODEL } from "../src/setup/Models.ts";
 import { isolatedEnvironment } from "./support/Environment.ts";
 import { catalog, connection, impactHttp, key } from "./support/Impact.ts";
 
@@ -54,11 +56,11 @@ describe.each([
   it.effect("keeps auxiliary requests on the available small Impact model", () =>
     Effect.gen(function* () {
       const settings = settingsOf((yield* prepare()).env);
-      assert.strictEqual(settings.model, "impact/gpt-6.1-sol");
-      assert.strictEqual(settings.small_model, "impact/gpt-5.6-luna");
+      assert.strictEqual(settings.model, `impact/${DEFAULT_MODEL}`);
+      assert.strictEqual(settings.small_model, `impact/${SMALL_MODEL}`);
     }).pipe(
       Effect.provide(
-        impactHttp(() => Response.json({ data: [...catalog.data, { ...catalog.data[1], id: "gpt-5.6-luna" }] })),
+        impactHttp(() => Response.json({ data: [...catalog.data, { ...catalog.data[1], id: SMALL_MODEL }] })),
       ),
     ),
   );
@@ -87,19 +89,19 @@ describe.each([
 });
 
 describe("OpenCode model discovery", () => {
-  it.effect("exposes Opus xhigh and max exactly as advertised and disables every other effort", () =>
+  it.effect("exposes advertised reasoning efforts and disables every other effort", () =>
     Effect.gen(function* () {
+      const advertised = ["low", "medium", "high", "xhigh", "max"] as const;
       const models = yield* openCodeModels(connection);
-      assert.deepStrictEqual(models["claude-opus-5-5"]!.variants, {
-        none: { disabled: true },
-        minimal: { disabled: true },
-        low: { reasoningEffort: "low" },
-        medium: { reasoningEffort: "medium" },
-        high: { reasoningEffort: "high" },
-        xhigh: { reasoningEffort: "xhigh" },
-        max: { reasoningEffort: "max" },
-        ultra: { disabled: true },
-      });
+      assert.deepStrictEqual(
+        models["claude-opus-5-5"]!.variants,
+        Object.fromEntries(
+          MODEL_EFFORTS.map((effort) => [
+            effort,
+            (advertised as readonly string[]).includes(effort) ? { reasoningEffort: effort } : { disabled: true },
+          ]),
+        ),
+      );
     }).pipe(
       Effect.provide(
         impactHttp(() =>

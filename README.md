@@ -19,7 +19,7 @@ impact login                                          # approve the code in your
 impact claude                                         # or codex, kilo, opencode, cursor, antigravity
 ```
 
-Both scripts only run `npm install --global @impact-relay/cli` (Node.js 22.13 or later) and say what to do if `impact` isn't on your `PATH`. Arguments, stdin and the exit code pass through to the client, so `impact claude -p "hello"` and `impact codex exec "hello"` work as usual.
+Both scripts install Node.js LTS automatically via official installers if Node.js 22.13 or later isn't installed yet, run `npm install --global @impact-relay/cli`, and say what to do if `impact` isn't on your `PATH`. Arguments, stdin and the exit code pass through to the client, so `impact claude -p "hello"` and `impact codex exec "hello"` work as usual.
 
 ## Documentation
 

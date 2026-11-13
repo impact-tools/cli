@@ -10,7 +10,7 @@ export const MODEL_EFFORTS = ["none", "minimal", "low", "medium", "high", "xhigh
 export type ModelEffort = (typeof MODEL_EFFORTS)[number];
 
 /** The model that answers the gateway's `web_search` unless the key names another; searches are priced at it. */
-export const SEARCH_MODEL_ID = "gemini-3.8-flash";
+export const SEARCH_MODEL_ID = "gemini-4-hydrogen";
 
 /**
  * The `searchModel` a key takes to search on Perplexity's web accounts instead of a Gemini model: a

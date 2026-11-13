@@ -140,7 +140,10 @@ export class CreatedApiKey extends Schema.Class<CreatedApiKey>("@impact-llm/sche
   secret: Schema.Redacted(Schema.String),
 }) {}
 
-/** The API a request came in on, as its log row records it; `gemini` is Google's Gemini API. */
+/**
+ * The API a request came in on, as its log row records it; `gemini` is Google's Gemini API, `sandbox`
+ * a code run in Impact Chat's sandbox.
+ */
 export const RequestEndpoint = Schema.Literals([
   "chat",
   "responses",
@@ -150,6 +153,7 @@ export const RequestEndpoint = Schema.Literals([
   "videos",
   "embeddings",
   "gemini",
+  "sandbox",
 ]);
 export type RequestEndpoint = typeof RequestEndpoint.Type;
 

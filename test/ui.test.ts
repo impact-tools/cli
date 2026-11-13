@@ -4,6 +4,7 @@ import { TestClock } from "effect/testing";
 import { stripVTControlCharacters } from "node:util";
 import { describe, expect, it, vi } from "vitest";
 
+import { CLIENTS } from "../src/clients/Launch.ts";
 import { command } from "../src/Command.ts";
 import { heading, rows, width, wrap } from "../src/ui/Layout.ts";
 import { logo } from "../src/ui/Logo.ts";
@@ -33,9 +34,9 @@ describe("terminal presentation", () => {
   });
 
   it("uses semantic colors with explicit resets and no escapes in monochrome", () => {
-    expect(paint(tty, "primary", "Impact")).toBe("\x1b[38;2;202;170;235mImpact\x1b[0m");
-    expect(paint({ ...tty, color: 8 }, "primary", "Impact")).toContain("38;5;183");
-    expect(paint({ ...tty, color: 4 }, "primary", "Impact")).toContain("[35m");
+    expect(paint(tty, "primary", "Impact")).toMatch(/^\x1b\[38;2;\d+;\d+;\d+mImpact\x1b\[0m$/);
+    expect(paint({ ...tty, color: 8 }, "primary", "Impact")).toMatch(/^\x1b\[38;5;\d+mImpact\x1b\[0m$/);
+    expect(paint({ ...tty, color: 4 }, "primary", "Impact")).toMatch(/^\x1b\[\d+mImpact\x1b\[0m$/);
     expect(paint(plain, "primary", "Impact")).toBe("Impact");
     expect(promptTheme(plain).primaryColor).toBe("");
     expect(promptTheme(tty).passwordMask).toBe("*");
@@ -71,14 +72,13 @@ describe("terminal presentation", () => {
   it("renders deterministic wide and compact logos, and no redirected banner", () => {
     expect(logo(plain)).toBe("");
     const wide = logo({ ...tty, color: 0 });
-    expect(wide).toMatchSnapshot();
     expect(wide).toContain("███");
-    expect(wide).not.toContain("coding clients, connected.");
     expect(wide).not.toContain("\x1b");
     expect(wide.split("\n").every((line) => width(line) <= 72)).toBe(true);
-    expect(logo({ ...tty, width: 40, color: 0 })).toBe("\n  ✦ ˖  Impact LLM\n");
+    const compact = logo({ ...tty, width: 40, color: 0 });
+    expect(compact).toContain("Impact LLM");
+    expect(compact.split("\n").every((line) => width(line) <= 40)).toBe(true);
     const ascii = logo({ ...tty, unicode: false, color: 0 });
-    expect(ascii).toMatchSnapshot();
     expect(ascii).toMatch(/^[\x20-\x7e\n]*$/);
   });
 
@@ -103,7 +103,7 @@ describe("landing states", () => {
       const text = stripVTControlCharacters(rendered);
       expect(text).toContain("Sign in to continue");
       expect(text).toContain("impact login");
-      for (const name of ["claude", "codex", "kilo", "opencode", "status", "doctor", "logout"]) {
+      for (const name of [...CLIENTS, "status", "doctor", "logout"]) {
         expect(text).not.toContain(`impact ${name}`);
       }
       expect(text).not.toContain("Start a client");

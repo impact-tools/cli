@@ -74,8 +74,8 @@ const launch = (command: string, options: SetupOptions) =>
   commandStep("launch", options.platform, [`impact ${command}`]);
 
 export const openCodeCliSteps = (options: SetupOptions): SetupStep[] => [
-  commandStep("install-client", options.platform, ["npm install --global opencode-ai"]),
   ...cliSteps(options),
+  commandStep("install-client", options.platform, ["npm install --global opencode-ai"]),
   launch("opencode", options),
 ];
 
@@ -88,8 +88,8 @@ export const openCodeManualSteps = (options: SetupOptions): SetupStep[] => [
 ];
 
 export const kiloCliSteps = (options: SetupOptions): SetupStep[] => [
-  commandStep("install-client", options.platform, ["npm install --global @kilocode/cli"]),
   ...cliSteps(options),
+  commandStep("install-client", options.platform, ["npm install --global @kilocode/cli"]),
   launch("kilo", options),
 ];
 

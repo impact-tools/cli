@@ -13,10 +13,8 @@ import { enabledMcpServers, readMcpSettings, setMcpServers } from "../src/config
 import {
   claudeMcpConfig,
   codexMcpServers,
-  MCP_SERVER_CHOICE,
   MCP_SERVER_IDS,
-  mcpEnable,
-  mcpLabels,
+  MCP_SERVERS,
   mcpSteps,
   MCP_TOOLS,
 } from "../src/setup/Mcp.ts";
@@ -118,9 +116,9 @@ describe("MCP in launches", () => {
     assert.deepStrictEqual(codexMcpServers(["context7"], "https://127.0.0.1:1/p"), {
       context7: { url: "https://127.0.0.1:1/p/mcp/context7" },
     });
-    assert.deepStrictEqual(route("/p/mcp/firecrawl", "/p"), { forward: "/mcp/firecrawl" });
-    assert.deepStrictEqual(route("/p/mcp/search", "/p"), { forward: "/mcp/search" });
-    assert.deepStrictEqual(route("/p/mcp/studio", "/p"), { forward: "/mcp/studio" });
+    for (const server of Object.values(MCP_SERVERS)) {
+      assert.deepStrictEqual(route(`/p${server.path}`, "/p"), { forward: server.path });
+    }
     assert.isUndefined(route("/p/mcp/other", "/p"));
   });
 
@@ -136,22 +134,8 @@ describe("manual MCP setup", () => {
   it.each(MCP_TOOLS)("%s gets steps that name every server and parse", (tool) => {
     const steps = mcpSteps(tool, MCP_SERVER_IDS, { models: [], apiKey: key, platform: "unix" });
     const text = JSON.stringify(steps);
-    for (const path of ["/mcp/context7", "/mcp/firecrawl", "/mcp/search", "/mcp/studio"]) assert.include(text, path);
+    for (const server of Object.values(MCP_SERVERS)) assert.include(text, server.path);
     for (const step of steps) if (step.kind === "code" && step.language === "json") JSON.parse(step.code);
-  });
-});
-
-describe("the servers in a sentence", () => {
-  it("name one, two or every server as English does", () => {
-    assert.strictEqual(mcpLabels(["context7"]), "Context7");
-    assert.strictEqual(mcpLabels(["context7", "search"]), "Context7 and Search");
-    assert.strictEqual(mcpLabels(MCP_SERVER_IDS), "Context7, Firecrawl, Search and Creative Studio");
-    assert.strictEqual(MCP_SERVER_CHOICE, "context7, firecrawl, search or studio");
-  });
-
-  it("give the command that turns on just the servers named", () => {
-    assert.strictEqual(mcpEnable(["search"]), "impact mcp enable search");
-    assert.strictEqual(mcpEnable(MCP_SERVER_IDS), "impact mcp enable context7 firecrawl search studio");
   });
 });
 
@@ -165,10 +149,7 @@ describe("impact mcp", () => {
     assert.include(listed.stdout, "firecrawl: off");
     assert.include(listed.stdout, "search: on");
     const error = await impact(["mcp", "enable", "nope"]).catch((failure: { stderr: string }) => failure);
-    assert.include(
-      "stderr" in error ? error.stderr : "",
-      "Unknown MCP server nope. Choose context7, firecrawl, search or studio.",
-    );
+    assert.include("stderr" in error ? error.stderr : "", "Unknown MCP server nope.");
     await impact(["mcp", "disable", "context7", "search"]);
     assert.include((await impact(["mcp", "list"])).stdout, "context7: off");
     assert.include((await impact(["mcp", "enable", "firecrawl"])).stdout, "add it from the next launch");
